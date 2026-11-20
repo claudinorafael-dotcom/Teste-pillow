@@ -93,6 +93,12 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 .note{font-size:13px;color:var(--muted)}
 .hist{font-size:13px;display:flex;flex-direction:column;gap:4px}
 .hist div{display:flex;justify-content:space-between;gap:8px}
+.cam{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
+.cam video{flex:1;width:100%;object-fit:cover;background:#000}
+.cam .bar{display:flex;align-items:center;justify-content:space-between;padding:14px max(20px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-right,0px));background:#000;color:#fff}
+.cam .bar button{background:transparent;border:0;color:#fff;font-size:15px;padding:10px 8px;cursor:pointer}
+.cam .shutter{width:68px;height:68px;border-radius:50%;background:#fff;border:5px solid #999 !important;padding:0 !important}
+.cam .hint{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 3px #000}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:40;max-width:90%}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -138,7 +144,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
     <div class="sec" style="margin-top:0">
       <h3>Vale a pena comprar?</h3>
       <div class="row" style="margin-bottom:10px">
-        <input type="file" id="q_foto" accept="image/*" capture="environment" hidden>
+        <input type="file" id="q_foto" accept="image/*" hidden>
         <button class="btn primary" id="q_btn_foto" type="button">📷 Fotografar o rótulo</button>
         <span class="note" id="q_fotoStatus"></span>
       </div>
@@ -215,6 +221,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 
 <button class="fab" id="fab">+ Garrafa</button>
 <div id="sheetHost"></div>
+<div id="camHost"></div>
 <div id="toastHost"></div>
 
 <script>
@@ -364,7 +371,7 @@ function formHtml(w = {}){
   <h2>${w.id ? "Editar garrafa" : "Nova garrafa"}</h2>
   <div class="meta">${w.id ? "" : "Fotografe o rótulo e deixe o preenchimento comigo, ou digite."}</div>
   <div class="row" style="margin-bottom:10px">
-    <input type="file" id="foto" accept="image/*" capture="environment" hidden>
+    <input type="file" id="foto" accept="image/*" hidden>
     <button class="btn ${w.id ? "" : "primary"}" id="btnFoto" type="button">📷 ${w.id ? (w.fotoId ? "Trocar foto do rótulo" : "Adicionar foto do rótulo") : "Identificar pelo rótulo"}</button>
     <span class="note" id="fotoStatus"></span>
   </div>
@@ -403,7 +410,7 @@ function formHtml(w = {}){
       </div>
       ${w.id ? `<button class="btn danger small" type="button" id="btnDelete">Excluir</button>` : ""}
     </div>
-    <div class="note" style="margin-top:8px">${w.id ? "" : "Ao adicionar, a ficha é gerada em seguida e um pedido de pesquisa de notas de terceiros (e de foto, se faltar) é enviado ao Claude."}</div>
+    <div class="note" style="margin-top:8px">${w.id ? "" : "Ao adicionar, o Claude pesquisa notas de terceiros, preço e janela e grava a ficha completa em alguns minutos."}</div>
   </form>`;
 }
 function readForm(){
@@ -420,14 +427,63 @@ function fillForm(d, p = "f_"){
   set("regiao", d.regiao); set("pais", d.pais); set("uvas", d.uvas); set("tamanho", d.tamanho);
   const t = $("#"+p+"tipo"); if (t && d.tipo && TIPOS.includes(d.tipo)) t.value = d.tipo;
 }
-function openForm(w){
-  state.pendingFoto = null;
+/* In-page camera: no app switch, so Android does not kill the page while photographing.
+   Falls back to the file input (camera app or gallery) when the browser refuses. */
+function tirarFoto(fileInput, onFile){
+  const md = navigator.mediaDevices;
+  if (!md || !md.getUserMedia){ fileInput.click(); return; }
+  const host = $("#camHost");
+  host.innerHTML = `<div class="cam" id="cam"><div class="hint">Enquadre o rótulo e toque no botão</div><video id="camVideo" autoplay playsinline muted></video>
+    <div class="bar"><button type="button" id="camCancel">Cancelar</button><button type="button" class="shutter" id="camShot" aria-label="Capturar"></button><button type="button" id="camGal">Galeria</button></div></div>`;
+  const video = $("#camVideo"); let stream = null;
+  const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; host.innerHTML = ""; };
+  $("#camCancel").onclick = stop;
+  $("#camGal").onclick = () => { stop(); fileInput.click(); };
+  $("#camShot").onclick = () => {
+    if (!video.videoWidth){ toast("A câmera ainda está abrindo."); return; }
+    const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext("2d").drawImage(video, 0, 0);
+    c.toBlob(b => { stop(); if (b) onFile(new File([b], "foto.jpg", { type:"image/jpeg" })); else toast("Não consegui capturar. Tente pela galeria."); }, "image/jpeg", 0.9);
+  };
+  md.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1440 } }, audio:false })
+    .then(st => { stream = st; video.srcObject = st; })
+    .catch(() => { stop(); fileInput.click(); });
+}
+/* Draft: Android often kills the page while the camera app is open; the form would vanish on reload.
+   Every keystroke and every camera tap saves the form to localStorage; on load, it is restored. */
+const DRAFT_KEY = "adega_draft";
+function saveDraft(prefix = "f_"){
+  try {
+    const form = prefix === "q_" ? $("#qform") : $("#wform"); if (!form) return;
+    const vals = {}; form.querySelectorAll("input,select").forEach(el => { if (el.id && el.type !== "file") vals[el.id] = el.value; });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ kind: prefix === "q_" ? "pesquisa" : "garrafa", vals, pendingFoto: state.pendingFoto || null, t: Date.now() }));
+  } catch {}
+}
+function clearDraft(){ try { localStorage.removeItem(DRAFT_KEY); } catch {} }
+function restoreDraft(){
+  let d = null; try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch {}
+  if (!d || !d.vals || Date.now() - (d.t||0) > 2*3600e3){ clearDraft(); return; }
+  clearDraft();
+  const filled = Object.entries(d.vals).some(([id,v]) => v && !/_(qtd|tamanho|tipo)$/.test(id));
+  if (!filled && !d.pendingFoto){ toast("O app reiniciou durante a foto. Tente de novo; se repetir, tire a foto pela câmera e escolha da galeria."); return; }
+  const apply = (st) => {
+    Object.entries(d.vals).forEach(([id,v]) => { const el = $("#"+id); if (el && v) el.value = v; });
+    state.pendingFoto = d.pendingFoto || null;
+    if (st) st.textContent = d.pendingFoto ? "Cadastro recuperado; a foto já estava enviada." : "Cadastro recuperado. Se faltar a foto, tire de novo.";
+  };
+  if (d.kind === "pesquisa"){ setView("pesquisa"); apply($("#q_fotoStatus")); }
+  else { if (!state.db) return; openForm(null, true); apply($("#fotoStatus")); }
+  toast("Recuperei o cadastro que estava em andamento.");
+}
+function openForm(w, keepFoto){
+  if (!keepFoto) state.pendingFoto = null;
   openSheet(formHtml(w || {}));
-  $("#btnCancel").onclick = w && w.id ? () => openDetail(w.id) : closeSheet;
+  $("#btnCancel").onclick = w && w.id ? () => openDetail(w.id) : () => { clearDraft(); closeSheet(); };
   const foto = $("#foto"), btnFoto = $("#btnFoto");
   const isEdit = !!(w && w.id);
   if (isEdit ? !state.assets : (!state.sample || !state.canImages)) btnFoto.hidden = true;
-  btnFoto.onclick = () => foto.click();
+  btnFoto.onclick = () => { if (!isEdit) saveDraft(); tirarFoto(foto, f => isEdit ? guardarFoto(f) : identificar(f)); };
+  if (!isEdit) $("#wform").oninput = () => saveDraft();
   foto.onchange = async () => { const f = foto.files[0]; foto.value = ""; await (isEdit ? guardarFoto(f) : identificar(f)); };
   if (isEdit) $("#btnDelete").onclick = () => confirmDelete(w);
   $("#wform").onsubmit = async (e) => {
@@ -443,7 +499,7 @@ function openForm(w){
       } else {
         d.criadoEm = new Date().toISOString(); d.ficha = null; d.pesquisa = { status:"pendente", pedidoEm:new Date().toISOString() };
         const ref = await state.db.collection("vinhos").add(d);
-        closeSheet(); toast("Adicionada. Pedindo a ficha ao Claude…");
+        clearDraft(); closeSheet(); toast("Adicionada. Pedindo a ficha ao Claude…");
         pedirPesquisa(ref.id, d);
       }
     } catch(err){ toast(dbErr(err)); $("#btnSave").disabled = false; }
@@ -477,6 +533,7 @@ async function avaliarCompra(){
   try {
     const doc = { ...q, fotoId: state.pendingFoto || "", rapida: null, verificada: null, status:"pendente", criadoEm:new Date().toISOString() };
     const ref = await state.db.collection("pesquisas").add(doc);
+    clearDraft();
     const p = { ...doc, id: ref.id };
     state.lastResultId = ref.id;
     $("#q_status").textContent = "";
@@ -616,6 +673,7 @@ async function identificar(file, opts = {}){
     await up;
     if (d && typeof d === "object"){ fillForm(d, prefix); st.textContent = "Rótulo lido. Confira os campos."; }
     else st.textContent = "Não consegui ler. Digite os dados.";
+    saveDraft(prefix);
   } catch(e){
     const code = e && e.code || "desconhecido";
     const msgs = { not_granted:"Leitura de rótulo não autorizada nesta página.", rate_limited:"Muitas leituras seguidas. Aguarde um minuto.", image_rejected:"Foto recusada (tipo ou tamanho). Tente outra.", images_unavailable:"Este aparelho não envia fotos ao Claude.", invalid_json:"O Claude leu, mas respondeu fora do formato.", refused:"O Claude recusou esta imagem.", upstream_error:"Falha de conexão com o Claude.", cancelled:"Leitura cancelada." };
@@ -799,7 +857,7 @@ function openProvadoForm(c, w){
     <div class="meta">${w ? esc(nomeCompleto(w)) + " " + esc(w.safra||"") : "Um vinho da adega ou qualquer outro que você provou."}</div>
     ${w ? "" : `<div class="field" style="margin-bottom:10px"><label for="c_adega">Da adega?</label><select id="c_adega"><option value="">Não, outro vinho</option>${adegaOpts}</select></div>`}
     <div class="row" style="margin-bottom:10px">
-      <input type="file" id="c_foto_rotulo" accept="image/*" capture="environment" hidden>
+      <input type="file" id="c_foto_rotulo" accept="image/*" hidden>
       <button class="btn ${w||isEdit?"":"primary"}" id="c_btn_rotulo" type="button">📷 ${src.fotoRotuloId ? "Trocar foto do rótulo" : "Identificar pelo rótulo"}</button>
       <span class="note" id="fotoStatus"></span>
     </div>
@@ -820,7 +878,7 @@ function openProvadoForm(c, w){
       </div>
       <div class="field" style="margin-top:10px"><label for="c_com">Como estava / anotações</label><textarea id="c_com" placeholder="Decantei 1 h. Fruta viva, tanino macio. Combinou com o cordeiro.">${esc(src.comentario)}</textarea></div>
       <div class="row" style="margin-top:10px">
-        <input type="file" id="c_foto_lugar" accept="image/*" capture="environment" hidden>
+        <input type="file" id="c_foto_lugar" accept="image/*" hidden>
         <button class="btn" id="c_btn_lugar" type="button">📸 ${src.fotoLugarId ? "Trocar foto do momento" : "Foto do momento"}</button>
         <span class="note" id="fotoLugarStatus"></span>
       </div>
@@ -830,17 +888,18 @@ function openProvadoForm(c, w){
   $("#c_cancel").onclick = () => isEdit ? openProvadoDetail(c.id) : (w ? openDetail(w.id) : closeSheet());
   const fr = $("#c_foto_rotulo"), br = $("#c_btn_rotulo");
   if (!state.sample || !state.canImages) br.hidden = true;
-  br.onclick = () => fr.click();
+  br.onclick = () => tirarFoto(fr, f => identificar(f));
   fr.onchange = async () => { const f = fr.files[0]; fr.value = ""; await identificar(f); };
   const fl = $("#c_foto_lugar"), bl = $("#c_btn_lugar");
   if (!state.assets) bl.hidden = true;
-  bl.onclick = () => fl.click();
-  fl.onchange = async () => {
-    const file = fl.files[0]; if (!file) return;
+  const subirLugar = async (file) => {
+    if (!file) return;
     const st = $("#fotoLugarStatus"); st.innerHTML = `<span class="spin"></span>Enviando…`;
     try { const r = await state.assets.upload(await shrinkImage(file)); state.pendingFotoLugar = r.id; st.textContent = "Foto pronta."; }
     catch(e){ st.textContent = "Não consegui enviar a foto."; }
   };
+  bl.onclick = () => tirarFoto(fl, subirLugar);
+  fl.onchange = () => { const f = fl.files[0]; fl.value = ""; subirLugar(f); };
   const sel = $("#c_adega");
   if (sel) sel.onchange = () => { const x = state.wines.find(y => y.id === sel.value); if (x) fillForm({ produtor:x.produtor, vinho:x.vinho, safra:x.safra, tipo:x.tipo }); };
   $("#cform").onsubmit = async (e) => {
@@ -899,9 +958,10 @@ $("#list").onclick = (e) => { const c = e.target.closest(".card"); if (c) openDe
 $("#list").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); } };
 $("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } state.view === "provados" ? openProvadoForm(null, null) : openForm(null); };
 /* Pesquisa view wiring */
-$("#q_btn_foto").onclick = () => $("#q_foto").click();
+$("#q_btn_foto").onclick = () => { saveDraft("q_"); tirarFoto($("#q_foto"), f => identificar(f, { prefix:"q_", status:"#q_fotoStatus" })); };
+$("#qform").oninput = () => saveDraft("q_");
 $("#q_foto").onchange = async () => { const el = $("#q_foto"); const f = el.files[0]; el.value = ""; await identificar(f, { prefix:"q_", status:"#q_fotoStatus" }); };
-$("#q_clear").onclick = () => { $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
+$("#q_clear").onclick = () => { clearDraft(); $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
 $("#qform").onsubmit = (e) => { e.preventDefault(); avaliarCompra(); };
 $("#qlist").onclick = (e) => { const c = e.target.closest(".card"); if (c) openPesquisaDetail(c.dataset.id); };
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => setView(t.dataset.v));
@@ -920,6 +980,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
   if (sample){ try { const lim = await sample.limits(); state.canImages = !!lim.images; } catch { state.canImages = false; } }
   $("#footNote").textContent = sample ? (state.canImages ? "Leitura de rótulo e fichas pelo Claude ativas." : "Fichas pelo Claude ativas; leitura de rótulo indisponível aqui.") : "Claude indisponível nesta visualização: cadastro manual.";
   if (!db){ $("#status").textContent = "Banco indisponível nesta visualização."; state.loaded = true; renderAll(); return; }
+  restoreDraft();
   let timer = setTimeout(() => { $("#status").textContent = "Ainda carregando… os dados podem estar desatualizados."; }, 10000);
   db.collection("vinhos").onSnapshot(snap => {
     state.wines = snap.docs.map(d => ({ id:d.id, ...d.data() }));
