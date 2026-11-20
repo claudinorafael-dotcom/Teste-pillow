@@ -144,7 +144,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
   <div id="viewAdega">
   <div class="tiles" id="tiles">
     <button class="tile" id="tTotal" data-f="todas" aria-pressed="true"><div class="n">–</div><div class="l">Garrafas</div></button>
-    <button class="tile ok" id="tAgora" data-f="agora"><div class="n">–</div><div class="l">Beber agora</div></button>
+    <button class="tile ok" id="tAgora" data-f="agora"><div class="n">–</div><div class="l">Pronto para beber</div></button>
     <button class="tile hold" id="tGuardar" data-f="guardar"><div class="n">–</div><div class="l">Guardar</div></button>
     <button class="tile warn" id="tUrgente" data-f="urgente"><div class="n">–</div><div class="l">Beber logo</div></button>
   </div>
@@ -201,7 +201,7 @@ function janela(w){
   if (a && YEAR < a) return {k:"hold", label:"Guardar", a, b};
   if (b && YEAR > b) return {k:"bad", label:"Passou do ponto", a, b};
   if (b && YEAR >= b - 1) return {k:"warn", label:"Beber logo", a, b};
-  return {k:"ok", label:"Beber agora", a, b};
+  return {k:"ok", label:"Pronto para beber", a, b};
 }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
 /* [key, short label for cards, long label for the detail sheet] */
