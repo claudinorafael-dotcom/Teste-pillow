@@ -146,6 +146,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
       <div class="row" style="margin-bottom:10px">
         <input type="file" id="q_foto" accept="image/*" hidden>
         <button class="btn primary" id="q_btn_foto" type="button">📷 Fotografar o rótulo</button>
+        <button class="btn small" id="q_btn_gal" type="button">🖼 Galeria</button>
         <span class="note" id="q_fotoStatus"></span>
       </div>
       <form id="qform">
@@ -373,6 +374,7 @@ function formHtml(w = {}){
   <div class="row" style="margin-bottom:10px">
     <input type="file" id="foto" accept="image/*" hidden>
     <button class="btn ${w.id ? "" : "primary"}" id="btnFoto" type="button">📷 ${w.id ? (w.fotoId ? "Trocar foto do rótulo" : "Adicionar foto do rótulo") : "Identificar pelo rótulo"}</button>
+    <button class="btn small" id="btnGal" type="button">🖼 Galeria</button>
     <span class="note" id="fotoStatus"></span>
   </div>
   <form id="wform">
@@ -429,16 +431,18 @@ function fillForm(d, p = "f_"){
 }
 /* In-page camera: no app switch, so Android does not kill the page while photographing.
    Falls back to the file input (camera app or gallery) when the browser refuses. */
+function cameraDoAparelho(fileInput){ fileInput.setAttribute("capture", "environment"); fileInput.click(); }
+function galeria(fileInput){ fileInput.removeAttribute("capture"); fileInput.click(); }
 function tirarFoto(fileInput, onFile){
   const md = navigator.mediaDevices;
-  if (!md || !md.getUserMedia){ fileInput.click(); return; }
+  if (!md || !md.getUserMedia || state.camBlocked){ cameraDoAparelho(fileInput); return; }
   const host = $("#camHost");
   host.innerHTML = `<div class="cam" id="cam"><div class="hint">Enquadre o rótulo e toque no botão</div><video id="camVideo" autoplay playsinline muted></video>
     <div class="bar"><button type="button" id="camCancel">Cancelar</button><button type="button" class="shutter" id="camShot" aria-label="Capturar"></button><button type="button" id="camGal">Galeria</button></div></div>`;
   const video = $("#camVideo"); let stream = null;
   const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; host.innerHTML = ""; };
   $("#camCancel").onclick = stop;
-  $("#camGal").onclick = () => { stop(); fileInput.click(); };
+  $("#camGal").onclick = () => { stop(); galeria(fileInput); };
   $("#camShot").onclick = () => {
     if (!video.videoWidth){ toast("A câmera ainda está abrindo."); return; }
     const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight;
@@ -447,7 +451,7 @@ function tirarFoto(fileInput, onFile){
   };
   md.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1440 } }, audio:false })
     .then(st => { stream = st; video.srcObject = st; })
-    .catch(() => { stop(); fileInput.click(); });
+    .catch(e => { stop(); state.camBlocked = true; toast(`Câmera no app indisponível (${(e && e.name) || "?"}). Abrindo a câmera do aparelho.`); cameraDoAparelho(fileInput); });
 }
 /* Draft: Android often kills the page while the camera app is open; the form would vanish on reload.
    Every keystroke and every camera tap saves the form to localStorage; on load, it is restored. */
@@ -483,6 +487,7 @@ function openForm(w, keepFoto){
   const isEdit = !!(w && w.id);
   if (isEdit ? !state.assets : (!state.sample || !state.canImages)) btnFoto.hidden = true;
   btnFoto.onclick = () => { if (!isEdit) saveDraft(); tirarFoto(foto, f => isEdit ? guardarFoto(f) : identificar(f)); };
+  const btnGal = $("#btnGal"); btnGal.hidden = btnFoto.hidden; btnGal.onclick = () => { if (!isEdit) saveDraft(); galeria(foto); };
   if (!isEdit) $("#wform").oninput = () => saveDraft();
   foto.onchange = async () => { const f = foto.files[0]; foto.value = ""; await (isEdit ? guardarFoto(f) : identificar(f)); };
   if (isEdit) $("#btnDelete").onclick = () => confirmDelete(w);
@@ -859,6 +864,7 @@ function openProvadoForm(c, w){
     <div class="row" style="margin-bottom:10px">
       <input type="file" id="c_foto_rotulo" accept="image/*" hidden>
       <button class="btn ${w||isEdit?"":"primary"}" id="c_btn_rotulo" type="button">📷 ${src.fotoRotuloId ? "Trocar foto do rótulo" : "Identificar pelo rótulo"}</button>
+      <button class="btn small" id="c_gal_rotulo" type="button">🖼 Galeria</button>
       <span class="note" id="fotoStatus"></span>
     </div>
     <form id="cform">
@@ -880,6 +886,7 @@ function openProvadoForm(c, w){
       <div class="row" style="margin-top:10px">
         <input type="file" id="c_foto_lugar" accept="image/*" hidden>
         <button class="btn" id="c_btn_lugar" type="button">📸 ${src.fotoLugarId ? "Trocar foto do momento" : "Foto do momento"}</button>
+        <button class="btn small" id="c_gal_lugar" type="button">🖼 Galeria</button>
         <span class="note" id="fotoLugarStatus"></span>
       </div>
       ${(!isEdit && (w || adegaOpts)) ? `<label style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:14px;color:var(--fg)"><input type="checkbox" id="c_baixa" style="width:auto" ${w?"checked":""}> Dar baixa de 1 garrafa na adega</label>` : ""}
@@ -889,6 +896,7 @@ function openProvadoForm(c, w){
   const fr = $("#c_foto_rotulo"), br = $("#c_btn_rotulo");
   if (!state.sample || !state.canImages) br.hidden = true;
   br.onclick = () => tirarFoto(fr, f => identificar(f));
+  const gr = $("#c_gal_rotulo"); gr.hidden = br.hidden; gr.onclick = () => galeria(fr);
   fr.onchange = async () => { const f = fr.files[0]; fr.value = ""; await identificar(f); };
   const fl = $("#c_foto_lugar"), bl = $("#c_btn_lugar");
   if (!state.assets) bl.hidden = true;
@@ -899,6 +907,7 @@ function openProvadoForm(c, w){
     catch(e){ st.textContent = "Não consegui enviar a foto."; }
   };
   bl.onclick = () => tirarFoto(fl, subirLugar);
+  const gl = $("#c_gal_lugar"); gl.hidden = bl.hidden; gl.onclick = () => galeria(fl);
   fl.onchange = () => { const f = fl.files[0]; fl.value = ""; subirLugar(f); };
   const sel = $("#c_adega");
   if (sel) sel.onchange = () => { const x = state.wines.find(y => y.id === sel.value); if (x) fillForm({ produtor:x.produtor, vinho:x.vinho, safra:x.safra, tipo:x.tipo }); };
@@ -960,6 +969,7 @@ $("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível.
 /* Pesquisa view wiring */
 $("#q_btn_foto").onclick = () => { saveDraft("q_"); tirarFoto($("#q_foto"), f => identificar(f, { prefix:"q_", status:"#q_fotoStatus" })); };
 $("#qform").oninput = () => saveDraft("q_");
+$("#q_btn_gal").onclick = () => { saveDraft("q_"); galeria($("#q_foto")); };
 $("#q_foto").onchange = async () => { const el = $("#q_foto"); const f = el.files[0]; el.value = ""; await identificar(f, { prefix:"q_", status:"#q_fotoStatus" }); };
 $("#q_clear").onclick = () => { clearDraft(); $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
 $("#qform").onsubmit = (e) => { e.preventDefault(); avaliarCompra(); };
