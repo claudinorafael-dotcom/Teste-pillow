@@ -27,7 +27,14 @@ A primeira versão usava três subagentes em paralelo por vinho (cerca de 350 mi
   A sessão principal só consolida e grava.
 - **Sites que bloqueiam** (nunca abrir; usar o trecho da busca e marcar "via busca, não conferido"): Wine Enthusiast,
   James Suckling, Wine Advocate, Decanter (nota em paywall), Wine Spectator, CellarTracker, Wine-Searcher, Wine.com,
-  Mercado Livre, Mistral, Grand Cru, World Wine. Vivino: tentar abrir uma vez. Descorchados, Pão de Açúcar, Evino: abrir.
+  Mercado Livre, Mistral, Grand Cru, World Wine. Descorchados, Pão de Açúcar, Evino: abrir.
+- **Vivino, o que funciona** (aprendido em 20/11 com o Cecchi e o 1865): a busca de texto do site não carrega. Em vez disso,
+  (1) WebSearch restrito a `vivino.com` com o nome do vinho para achar a URL `…/w/<número>`; (2) WebFetch dessa URL com
+  `?year=<safra>`: a página abre e mostra nota média da safra e nº de avaliações. Nunca gravar "não encontrado no Vivino"
+  sem ter feito os dois passos.
+- **Críticos pagos**: uma busca por crítico (vinho + safra + nome do crítico); lojas e agregadores costumam expor a nota.
+  O Rafael também pode mandar capturas do Wine-Searcher, que mostra Suckling/Atkin/Descorchados por safra; aceitar como fonte
+  ("via Wine-Searcher, captura do Rafael").
 - **O celular não gera mais ficha**: o app só lê o rótulo (modelo padrão) e pede a pesquisa. A ficha completa
   (resumo, estilo, uvas, vinificação, janela, harmonização, notas, preço) é escrita pela pesquisa. Há um botão
   "Ficha provisória (sem pesquisa)" na garrafa, modelo padrão, só para emergência.
