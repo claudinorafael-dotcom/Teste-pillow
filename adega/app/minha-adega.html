@@ -131,6 +131,38 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-v="adega" aria-pressed="true" id="tabAdega">Adega</button>
     <button class="tab" role="tab" data-v="provados" aria-pressed="false" id="tabProvados">Provados <small id="provCount"></small></button>
+    <button class="tab" role="tab" data-v="pesquisa" aria-pressed="false" id="tabPesquisa">Pesquisa</button>
+  </div>
+
+  <div id="viewPesquisa" hidden>
+    <div class="sec" style="margin-top:0">
+      <h3>Vale a pena comprar?</h3>
+      <div class="row" style="margin-bottom:10px">
+        <input type="file" id="q_foto" accept="image/*" capture="environment" hidden>
+        <button class="btn primary" id="q_btn_foto" type="button">📷 Fotografar o rótulo</button>
+        <span class="note" id="q_fotoStatus"></span>
+      </div>
+      <form id="qform">
+        <div class="grid2">
+          <div class="field"><label for="q_produtor">Produtor</label><input id="q_produtor" placeholder="Catena Zapata"></div>
+          <div class="field"><label for="q_vinho">Vinho</label><input id="q_vinho" placeholder="Catena Alta Malbec"></div>
+        </div>
+        <div class="grid3" style="margin-top:10px">
+          <div class="field"><label for="q_safra">Safra</label><input id="q_safra" inputmode="numeric" placeholder="2021"></div>
+          <div class="field"><label for="q_preco">Preço pedido (R$)</label><input id="q_preco" inputmode="decimal" placeholder="350" required></div>
+          <div class="field"><label for="q_loja">Onde</label><input id="q_loja" placeholder="Mistral, restaurante…"></div>
+        </div>
+        <input id="q_tipo" hidden><input id="q_denominacao" hidden><input id="q_regiao" hidden><input id="q_pais" hidden><input id="q_uvas" hidden><input id="q_tamanho" hidden>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" type="submit" id="q_ok">Avaliar</button>
+          <button class="btn" type="button" id="q_clear">Limpar</button>
+          <span class="note" id="q_status"></span>
+        </div>
+      </form>
+    </div>
+    <div id="q_result"></div>
+    <h3 style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px">Pesquisas anteriores</h3>
+    <div class="list" id="qlist"><div class="empty">Nenhuma pesquisa ainda.</div></div>
   </div>
 
   <div id="viewProvados" hidden>
@@ -374,11 +406,11 @@ function readForm(){
     loja:v("f_loja"), preco:v("f_preco"), dataCompra:v("f_data"), local:v("f_local"), obs:v("f_obs")
   };
 }
-function fillForm(d){
-  const set = (id, val) => { const el = $("#"+id); if (el && val !== undefined && val !== null && String(val) !== "") el.value = String(val); };
-  set("f_produtor", d.produtor); set("f_vinho", d.vinho); set("f_safra", d.safra); set("f_denominacao", d.denominacao);
-  set("f_regiao", d.regiao); set("f_pais", d.pais); set("f_uvas", d.uvas); set("f_tamanho", d.tamanho);
-  if (d.tipo && TIPOS.includes(d.tipo)) $("#f_tipo").value = d.tipo;
+function fillForm(d, p = "f_"){
+  const set = (id, val) => { const el = $("#"+p+id); if (el && val !== undefined && val !== null && String(val) !== "") el.value = String(val); };
+  set("produtor", d.produtor); set("vinho", d.vinho); set("safra", d.safra); set("denominacao", d.denominacao);
+  set("regiao", d.regiao); set("pais", d.pais); set("uvas", d.uvas); set("tamanho", d.tamanho);
+  const t = $("#"+p+"tipo"); if (t && d.tipo && TIPOS.includes(d.tipo)) t.value = d.tipo;
 }
 function openForm(w){
   state.pendingFoto = null;
@@ -417,6 +449,87 @@ async function guardarFoto(file){
   catch(e){ st.textContent = e.code === "quota_exceeded" ? "Sem espaço para fotos." : "Não consegui enviar a foto."; }
 }
 /* ---------- research request to Claude (wakes the building session) ---------- */
+/* ---------- Pesquisa: "vale comprar por R$ X?" ---------- */
+const VERED = { vale:{k:"ok", t:"Vale a pena"}, ressalva:{k:"warn", t:"Vale, com ressalvas"}, nao:{k:"bad", t:"Não vale por esse preço"} };
+function veredPill(v){ const x = VERED[v] || {k:"none", t:v||"?"}; return `<span class="pill ${x.k}">${esc(x.t)}</span>`; }
+function pesquisaPrompt(q){
+  return `Você é um sommelier e consultor de compras de vinho no Brasil. Ano atual: ${YEAR}. Avalie se vale comprar:
+Vinho: ${[q.produtor,q.vinho].filter(Boolean).join(" · ")} ${q.safra||""}. Tipo: ${q.tipo||"?"}. ${q.denominacao||""} ${q.regiao||""} ${q.pais||""}. Uvas: ${q.uvas||"?"}.
+Preço pedido: R$ ${q.precoPedido}${q.loja ? " em " + q.loja : ""}.
+Responda APENAS com JSON:
+{"resumo":"2 frases sobre produtor e vinho","estilo":"1 frase","notasConhecidas":{"suckling":null,"parker":null,"spectator":null,"decanter":null,"vinous":null,"atkin":null,"descorchados":null,"vivino":null},"precoJusto":"faixa em R$ que esse vinho costuma custar em importadoras brasileiras, ex 'R$ 250 a 320'","veredito":"vale|ressalva|nao","titulo":"frase curta com o veredito, ex 'Vale: está 20% abaixo do preço normal'","justificativa":"3 a 5 frases comparando preço pedido x preço justo, qualidade, safra e alternativas","alternativas":"1 ou 2 vinhos parecidos que seriam melhor negócio na mesma faixa, com preço aproximado","janela":"ex '2026 a 2032'","confianca":"alta|média|baixa"}
+Regras: só preencha notas quando tiver confiança razoável, senão null. Se não conhecer o vinho, diga isso na justificativa, estime pelo produtor/região/safra e marque confiança baixa. Seja direto.`;
+}
+async function avaliarCompra(){
+  const v = id => ($("#"+id)?.value ?? "").trim();
+  const q = { produtor:v("q_produtor"), vinho:v("q_vinho"), safra:v("q_safra"), tipo:v("q_tipo"), denominacao:v("q_denominacao"), regiao:v("q_regiao"), pais:v("q_pais"), uvas:v("q_uvas"), precoPedido:v("q_preco"), loja:v("q_loja") };
+  if (!q.produtor && !q.vinho){ toast("Informe o vinho ou fotografe o rótulo."); return; }
+  if (!q.precoPedido){ toast("Informe o preço pedido."); return; }
+  if (!state.sample){ toast("Claude indisponível nesta visualização."); return; }
+  $("#q_ok").disabled = true; $("#q_status").innerHTML = `<span class="spin"></span>Avaliando…`;
+  $("#q_result").innerHTML = "";
+  try {
+    const r = await state.sample.json(pesquisaPrompt(q), { modelTier:"complex", cache:false });
+    if (!r || typeof r !== "object") throw {code:"invalid_json"};
+    const doc = { ...q, fotoId: state.pendingFoto || "", rapida: r, verificada: null, status:"rapida", criadoEm:new Date().toISOString() };
+    const ref = await state.db.collection("pesquisas").add(doc);
+    $("#q_status").textContent = "";
+    renderResultado({ ...doc, id: ref.id }, $("#q_result"));
+  } catch(e){
+    $("#q_status").textContent = e.code === "not_granted" ? "Uso do Claude não autorizado." : e.code === "rate_limited" ? "Muitas consultas seguidas. Aguarde." : e.code === "invalid_json" ? "Resposta fora do formato. Tente de novo." : "Não consegui avaliar agora.";
+  } finally { $("#q_ok").disabled = false; }
+}
+function notasLinha(n){ if (!n) return ""; return SCORE_KEYS.filter(([k]) => n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("") || `<span class="nt none">sem notas</span>`; }
+function renderResultado(p, host){
+  const r = p.rapida || {}, vf = p.verificada;
+  host.innerHTML = `<div class="sec">
+    <div class="row" style="justify-content:space-between">${veredPill((vf||r).veredito)}<span class="note">${vf ? "Verificado na internet pelo Claude" : "Veredito imediato, sem pesquisa na internet"}</span></div>
+    <h2 style="margin:8px 0 2px">${esc([p.produtor,p.vinho].filter(Boolean).join(" · "))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></h2>
+    <div class="meta">Pedido: R$ ${esc(p.precoPedido)}${p.loja ? " em " + esc(p.loja) : ""} · Preço justo: ${esc((vf||r).precoJusto || (vf && vf.precoMercado) || "?")}</div>
+    <div style="font-weight:600;margin:6px 0">${esc((vf||r).titulo||"")}</div>
+    <div class="pre">${esc((vf||r).justificativa||"")}</div>
+    ${(vf||r).alternativas ? `<div class="note" style="margin-top:8px"><b>Alternativas:</b> ${esc((vf||r).alternativas)}</div>` : ""}
+    <div class="notas" style="margin-top:8px">${notasLinha(vf ? vf.notas : r.notasConhecidas)}</div>
+    ${vf && vf.fontes ? `<div class="note" style="margin-top:6px">Fontes: ${vf.fontes.map(esc).join("; ")}</div>` : `<div class="note" style="margin-top:6px">Confiança: ${esc(r.confianca||"?")}. Notas e preço são da memória do Claude; para confirmar, peça a verificação.</div>`}
+    <div class="row" style="margin-top:12px">
+      ${vf ? "" : (p.status === "solicitada" ? `<span class="note">Verificação pedida, aguardando resposta.</span>` : `<button class="btn small" id="q_verif">Pedir verificação na internet</button>`)}
+      <button class="btn small" id="q_add">Comprei: adicionar à adega</button>
+    </div></div>`;
+  const bv = $("#q_verif", host); if (bv) bv.onclick = () => pedirVerificacao(p);
+  const ba = $("#q_add", host); if (ba) ba.onclick = () => { closeSheet(); setView("adega"); openForm(null); fillForm(p); $("#f_preco").value = p.precoPedido||""; $("#f_loja").value = p.loja||""; if (p.fotoId) state.pendingFoto = p.fotoId; };
+}
+async function pedirVerificacao(p){
+  if (!state.comments) { toast("Envio ao Claude indisponível aqui."); return; }
+  try {
+    const can = await state.comments.canSendToClaude();
+    if (can !== "available"){ toast(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora." : "Envio ao Claude indisponível."); return; }
+    const anchor = await state.comments.anchorFor($("#qlist"));
+    const text = `Avaliar compra: ${[p.produtor,p.vinho].filter(Boolean).join(" · ")} ${p.safra||""} por R$ ${p.precoPedido}${p.loja ? " em " + p.loja : ""}. Pesquisar notas de terceiros e preço de mercado no Brasil e dar o veredito. Documento pesquisas/${p.id}.`;
+    const r = await state.comments.sendToClaude({ anchor, text });
+    await state.db.doc("pesquisas/"+p.id).update({ status:"solicitada", threadId:r.threadId });
+    toast("Verificação pedida. A resposta chega aqui mesmo.");
+  } catch(e){ toast(e.code === "rate_limited" ? "Muitos pedidos seguidos." : "Não consegui enviar o pedido."); }
+}
+function renderPesquisas(){
+  const list = $("#qlist"); if (!list) return;
+  const arr = (state.pesquisas||[]).slice().sort((a,b) => (b.criadoEm||"").localeCompare(a.criadoEm||""));
+  if (!arr.length){ list.innerHTML = `<div class="empty">Nenhuma pesquisa ainda.</div>`; return; }
+  list.innerHTML = arr.map(p => { const v = p.verificada || p.rapida || {}; return `<div class="card" data-id="${esc(p.id)}" role="button" tabindex="0">
+      <div class="name">${esc([p.produtor,p.vinho].filter(Boolean).join(" · "))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></div>
+      <div class="right">${veredPill(v.veredito)}</div>
+      <div class="sub">R$ ${esc(p.precoPedido)}${p.loja ? " · " + esc(p.loja) : ""} · ${esc((p.criadoEm||"").slice(0,10))}${p.verificada ? " · verificado" : p.status === "solicitada" ? " · verificação pedida" : ""}</div>
+      <div class="right"><span class="note">${esc(v.precoJusto || (p.verificada && p.verificada.precoMercado) || "")}</span></div>
+    </div>`; }).join("");
+}
+function openPesquisaDetail(id){
+  const p = (state.pesquisas||[]).find(x => x.id === id); if (!p){ closeSheet(); return; }
+  openSheet(`<div class="row" style="justify-content:flex-end"><button class="btn small" id="qd_close">Fechar</button></div><div id="qd_body"></div>
+    <div class="row" style="margin-top:8px"><button class="btn danger small" id="qd_del">Excluir pesquisa</button></div>`);
+  $("#sheet").dataset.qid = id;
+  renderResultado(p, $("#qd_body"));
+  $("#qd_close").onclick = closeSheet;
+  $("#qd_del").onclick = async () => { try { await state.db.doc("pesquisas/"+id).delete(); closeSheet(); toast("Excluída."); } catch(e){ toast(dbErr(e)); } };
+}
 function pedidoTexto(id, w){
   return `Pesquisar avaliações de terceiros, preço de mercado${w.fotoId ? "" : " e foto do rótulo"} para: ${nomeCompleto(w)} ${w.safra||""} (${[w.tipo,w.denominacao,w.regiao,w.pais].filter(Boolean).join(", ")}). Documento vinhos/${id}.`;
 }
@@ -451,23 +564,24 @@ async function confirmDelete(w){
 }
 
 /* ---------- identify by label ---------- */
-async function identificar(file){
+async function identificar(file, opts = {}){
   if (!file) return;
-  const st = $("#fotoStatus"); st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
+  const prefix = opts.prefix || "f_";
+  const st = $(opts.status || "#fotoStatus"); st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
   const prompt = `Esta é a foto do rótulo de uma garrafa de vinho. Identifique o vinho e responda APENAS com um objeto JSON com estas chaves (string vazia quando não souber): {"produtor":"","vinho":"","safra":"","tipo":"","denominacao":"","regiao":"","pais":"","uvas":"","tamanho":"750ml"}. "tipo" deve ser um de: Tinto, Branco, Rosé, Espumante, Doce, Fortificado. "safra" é o ano com 4 dígitos ou "NV". "vinho" é o nome da cuvée sem o produtor. Use o conhecimento que tiver sobre o produtor para preencher denominação, região, país e uvas mesmo que não estejam no rótulo. Exemplo: {"produtor":"Jacopo Biondi Santi","vinho":"Sassoalloro","safra":"2021","tipo":"Tinto","denominacao":"Toscana IGT","regiao":"Toscana, Maremma","pais":"Itália","uvas":"Sangiovese","tamanho":"750ml"}`;
   try {
     const small = await shrinkImage(file);
     const up = state.assets ? state.assets.upload(small).then(r => { state.pendingFoto = r.id; }).catch(() => {}) : Promise.resolve();
     const d = await state.sample.json(prompt, { images:[small], modelTier:"default" });
     await up;
-    if (d && typeof d === "object"){ fillForm(d); st.textContent = "Rótulo lido. Confira os campos."; }
+    if (d && typeof d === "object"){ fillForm(d, prefix); st.textContent = "Rótulo lido. Confira os campos."; }
     else st.textContent = "Não consegui ler. Digite os dados.";
   } catch(e){
     const code = e && e.code || "desconhecido";
     const msgs = { not_granted:"Leitura de rótulo não autorizada nesta página.", rate_limited:"Muitas leituras seguidas. Aguarde um minuto.", image_rejected:"Foto recusada (tipo ou tamanho). Tente outra.", images_unavailable:"Este aparelho não envia fotos ao Claude.", invalid_json:"O Claude leu, mas respondeu fora do formato.", refused:"O Claude recusou esta imagem.", upstream_error:"Falha de conexão com o Claude.", cancelled:"Leitura cancelada." };
     st.innerHTML = `${esc(msgs[code] || "Não consegui ler o rótulo.")} <span style="opacity:.7">(${esc(code)})</span> <button type="button" class="btn small" id="btnRetry">Tentar de novo</button>`;
     console.error("identificar", code, e && e.message, e && e.text);
-    const r = $("#btnRetry"); if (r) r.onclick = () => identificar(file);
+    const r = $("#btnRetry"); if (r) r.onclick = () => identificar(file, opts);
   }
 }
 
@@ -713,11 +827,13 @@ function openProvadoForm(c, w){
 }
 function setView(v){
   state.view = v;
-  $("#viewAdega").hidden = v !== "adega"; $("#viewProvados").hidden = v !== "provados";
+  $("#viewAdega").hidden = v !== "adega"; $("#viewProvados").hidden = v !== "provados"; $("#viewPesquisa").hidden = v !== "pesquisa";
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-pressed", t.dataset.v === v ? "true" : "false"));
   $("#fab").textContent = v === "provados" ? "+ Provado" : "+ Garrafa";
+  $("#fab").hidden = v === "pesquisa";
   if (location.hash !== "#"+v) history.replaceState(null, "", "#"+v);
   if (v === "provados") renderProvados();
+  if (v === "pesquisa") renderPesquisas();
 }
 
 /* ---------- export ---------- */
@@ -742,12 +858,19 @@ $("#sort").onchange = (e) => { state.sort = e.target.value; renderList(); };
 $("#list").onclick = (e) => { const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); };
 $("#list").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); } };
 $("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } state.view === "provados" ? openProvadoForm(null, null) : openForm(null); };
+/* Pesquisa view wiring */
+$("#q_btn_foto").onclick = () => $("#q_foto").click();
+$("#q_foto").onchange = () => identificar($("#q_foto").files[0], { prefix:"q_", status:"#q_fotoStatus" });
+$("#q_clear").onclick = () => { $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
+$("#qform").onsubmit = (e) => { e.preventDefault(); avaliarCompra(); };
+$("#qlist").onclick = (e) => { const c = e.target.closest(".card"); if (c) openPesquisaDetail(c.dataset.id); };
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => setView(t.dataset.v));
-window.addEventListener("hashchange", () => setView(location.hash === "#provados" ? "provados" : "adega"));
+const viewFromHash = () => location.hash === "#provados" ? "provados" : location.hash === "#pesquisa" ? "pesquisa" : "adega";
+window.addEventListener("hashchange", () => setView(viewFromHash()));
 $("#pq").oninput = (e) => { state.pq = e.target.value.trim(); renderProvados(); };
 $("#plist").onclick = (e) => { const c = e.target.closest(".pcard"); if (c) openProvadoDetail(c.dataset.id); };
 $("#plist").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".pcard"); if (c) openProvadoDetail(c.dataset.id); } };
-setView(location.hash === "#provados" ? "provados" : "adega");
+setView(viewFromHash());
 $("#btnExport").onclick = exportCsv;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
 
@@ -765,6 +888,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
     renderAll();
     const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#b_ok")) openDetail(sh.dataset.id);
   }, err => { clearTimeout(timer); $("#status").textContent = "Não foi possível carregar a adega."; state.loaded = true; renderAll(); });
+  db.collection("pesquisas").onSnapshot(snap => {
+    state.pesquisas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderPesquisas();
+    const sh = $("#sheet"); if (sh && sh.dataset.qid) openPesquisaDetail(sh.dataset.qid);
+  }, () => {});
   db.collection("consumos").onSnapshot(snap => {
     state.consumos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     renderProvados();
