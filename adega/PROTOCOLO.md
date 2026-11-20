@@ -12,7 +12,7 @@ Banco: coleções `vinhos` e `consumos` (ArtifactData). Fotos: assets do artifac
 ## Para cada vinho pendente
 
 1. Pesquisar na web (WebSearch) notas de terceiros **da safra exata**; se não houver, safras vizinhas, dizendo isso:
-   James Suckling, Wine Advocate/Parker, Wine Spectator, Decanter, Vinous/Galloni, Jancis Robinson, Falstaff,
+   James Suckling (suckling), Wine Advocate/Parker (parker), Wine Spectator (spectator), Decanter (decanter), Vinous/Galloni (vinous), Tim Atkin (atkin), Descorchados (descorchados), Vivino (vivino, 1–5), CellarTracker (cellartracker); chaves entre parênteses são as de ficha.notas. Também Jancis Robinson, Falstaff,
    Guia Descorchados (chilenos), Tim Atkin (argentinos), Vivino (nota 1–5 e nº de avaliações), CellarTracker (média).
 2. Janela de consumo: preferir a janela publicada por crítico; senão, derivar das notas da comunidade.
 3. Preço de mercado no Brasil: Mistral, Grand Cru, World Wine, Evino, Wine.com.br, Vinhos do Mundo; registrar a faixa e a data.

@@ -97,6 +97,12 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 .pre{white-space:pre-wrap;font-size:14px}
+.notas{display:flex;gap:6px;flex-wrap:wrap;min-width:0;align-items:center}
+.nt{font-size:12px;background:var(--surface2);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nt b{color:var(--accent);font-weight:700;margin-right:2px}
+.nt.none{color:var(--muted);background:transparent;padding-left:0}
+.pr{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pr.est{color:var(--muted);font-weight:500}
 .thumb{width:28px;height:28px;object-fit:cover;border-radius:6px;vertical-align:-7px;margin-right:8px;background:var(--surface2)}
 .label-img{max-width:100%;max-height:260px;border-radius:var(--r);display:block;margin:0 auto 10px;background:var(--surface2)}
 </style>
@@ -168,6 +174,19 @@ function janela(w){
   return {k:"ok", label:"Beber agora", a, b};
 }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
+/* [key, short label for cards, long label for the detail sheet] */
+const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / Wine Advocate"],["spectator","WS","Wine Spectator"],["decanter","DEC","Decanter"],["vinous","VIN","Vinous / Galloni"],["atkin","TA","Tim Atkin"],["descorchados","DESC","Descorchados"],["vivino","Vivino","Vivino"],["cellartracker","CT","CellarTracker"]];
+const fmtNota = v => typeof v === "number" ? String(v).replace(".", ",") : String(v);
+function notasCurtas(w){
+  const n = w.ficha && w.ficha.notas; if (!n) return "";
+  return SCORE_KEYS.filter(([k]) => n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("");
+}
+function precoCurto(w){
+  if (w.preco) return `<span class="pr">Pago R$ ${esc(w.preco)}</span>`;
+  const e = w.ficha && w.ficha.precoEstimado; if (!e) return "";
+  const m = String(e).match(/R\$\s?[\d\.]+(?:\s?(?:a|-|–)\s?R?\$?\s?[\d\.]+)?/);
+  return `<span class="pr est" title="${esc(e)}">≈ ${esc(m ? m[0] : e)}</span>`;
+}
 
 /* ---------- render list ---------- */
 function filtered(){
@@ -220,6 +239,8 @@ function renderList(){
       <div class="right"><span class="qty">${w.qtd|0} gf</span><span class="pill ${j.k}">${esc(j.label)}${j.a||j.b ? ` ${j.a||"?"}–${j.b||"?"}` : ""}</span></div>
       <div class="sub">${esc(sub)}</div>
       <div class="right"><span class="pill tipo">${esc(w.tipo||"")}</span></div>
+      <div class="notas">${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div>
+      <div class="right">${precoCurto(w)}</div>
     </div>`;
   }).join("");
 }
@@ -391,13 +412,13 @@ function fichaPrompt(w){
   return `Você é um sommelier experiente. Monte a ficha técnica do vinho abaixo para um colecionador que quer saber quando beber. Ano atual: ${YEAR}.
 Vinho: ${nomeCompleto(w)} ${w.safra||""}. Tipo: ${w.tipo||""}. Denominação: ${w.denominacao||""}. Região: ${w.regiao||""}, ${w.pais||""}. Uvas: ${w.uvas||""}.
 Responda APENAS com um objeto JSON com estas chaves:
-{"resumo":"2 frases sobre o produtor e o que é este vinho","estilo":"1 frase sobre perfil de aroma, corpo, tanino, acidez","uvas":"uvas do blend se souber","vinificacao":"estágio em madeira, se souber","janelaInicio":2024,"janelaFim":2031,"apice":2027,"estadoHoje":"frase curta: 'guardar', 'beber agora', 'no ápice', 'beber logo' ou 'passou do ponto', com 1 justificativa sobre a safra","safraComentario":"1 frase sobre a qualidade da safra nessa região","decantar":"ex: '45 min a 1 h' ou 'não precisa'","temperatura":"ex: '16 a 18 °C'","harmonizacao":"3 a 5 sugestões concretas de pratos, separadas por ponto e vírgula","notas":{"suckling":null,"parker":null,"spectator":null,"vivino":null},"precoEstimado":"faixa de preço de varejo no Brasil em reais, ex: 'R$ 300 a 400', ou null","confianca":"alta|média|baixa","observacoes":"qualquer alerta: safra fraca, risco de garrafa, versão comemorativa, etc."}
+{"resumo":"2 frases sobre o produtor e o que é este vinho","estilo":"1 frase sobre perfil de aroma, corpo, tanino, acidez","uvas":"uvas do blend se souber","vinificacao":"estágio em madeira, se souber","janelaInicio":2024,"janelaFim":2031,"apice":2027,"estadoHoje":"frase curta: 'guardar', 'beber agora', 'no ápice', 'beber logo' ou 'passou do ponto', com 1 justificativa sobre a safra","safraComentario":"1 frase sobre a qualidade da safra nessa região","decantar":"ex: '45 min a 1 h' ou 'não precisa'","temperatura":"ex: '16 a 18 °C'","harmonizacao":"3 a 5 sugestões concretas de pratos, separadas por ponto e vírgula","notas":{"suckling":null,"parker":null,"spectator":null,"decanter":null,"vinous":null,"atkin":null,"descorchados":null,"vivino":null,"cellartracker":null},"precoEstimado":"faixa de preço de varejo no Brasil em reais, ex: 'R$ 300 a 400', ou null","confianca":"alta|média|baixa","observacoes":"qualquer alerta: safra fraca, risco de garrafa, versão comemorativa, etc."}
 Regras: anos como números. Em "notas", só preencha quando tiver confiança razoável na nota real dessa safra ou de safras vizinhas; caso contrário null. Vivino é escala 1 a 5. "precoEstimado" é uma estimativa do preço em importadoras brasileiras (Mistral, Grand Cru, World Wine); se não tiver ideia, null. Não invente. Se não conhecer o vinho, estime a janela pelo tipo, região e safra e marque confianca "baixa".`;
 }
 async function gerarFicha(w, auto){
   if (!state.sample) { if(!auto) toast("Geração de ficha indisponível aqui."); return; }
   try {
-    const f = await state.sample.json(fichaPrompt(w), { modelTier:"default", cache:false });
+    const f = await state.sample.json(fichaPrompt(w), { modelTier:"complex", cache:false });
     if (!f || typeof f !== "object") throw {code:"invalid_json"};
     f.atualizadoEm = new Date().toISOString();
     await state.db.doc("vinhos/"+w.id).update({ ficha:f });
@@ -415,7 +436,7 @@ function openDetail(id){
   const f = w.ficha || null; const j = janela(w);
   const hist = state.consumos.filter(c => c.vinhoId === id).sort((a,b)=> (b.data||"").localeCompare(a.data||""));
   const nota = (v) => v === null || v === undefined || v === "" ? null : v;
-  const scores = f && f.notas ? [["suckling","Suckling"],["parker","Parker"],["spectator","Spectator"],["vivino","Vivino"]].filter(([k]) => nota(f.notas[k]) !== null).map(([k,l]) => `<div class="score"><div class="v">${esc(f.notas[k])}</div><div class="s">${l}</div></div>`).join("") : "";
+  const scores = f && f.notas ? SCORE_KEYS.filter(([k]) => nota(f.notas[k]) !== null).map(([k,,l]) => `<div class="score"><div class="v">${esc(fmtNota(f.notas[k]))}</div><div class="s">${l}</div></div>`).join("") : "";
   let winBar = "";
   if (j.a && j.b){
     const lo = Math.min(j.a, YEAR) - 1, hi = Math.max(j.b, YEAR) + 1, span = hi - lo;
@@ -433,6 +454,7 @@ function openDetail(id){
   ${w.fotoId ? `<img class="label-img" src="${esc(blobUrl(w.fotoId))}" alt="Rótulo de ${esc(nomeCompleto(w))}">` : ""}
   <div class="row" style="margin-bottom:6px">
     <span class="qty" style="font-weight:700">${w.qtd|0} garrafa${(w.qtd|0)===1?"":"s"}</span>
+    ${precoCurto(w)}${w.preco ? "" : `<button class="btn small" id="btnPreco">Informar preço pago</button>`}
     ${(w.qtd|0) > 0 ? `<button class="btn primary small" id="btnBebi">🍷 Bebi uma</button>` : `<span class="note">Sem garrafas na adega.</span>`}
   </div>
   <div class="sec">
@@ -471,6 +493,20 @@ function openDetail(id){
   $("#btnFicha").onclick = async () => { $("#btnFicha").disabled = true; $("#fichaStatus").innerHTML = `<span class="spin"></span>Consultando…`; await gerarFicha(w, false); if ($("#btnFicha")) $("#btnFicha").disabled = false; if ($("#fichaStatus")) $("#fichaStatus").textContent = ""; };
   const bebi = $("#btnBebi"); if (bebi) bebi.onclick = () => openBebi(w);
   const pq = $("#btnPesq"); if (pq) pq.onclick = async () => { pq.disabled = true; await pedirPesquisa(w.id, w, true); };
+  const bp = $("#btnPreco"); if (bp) bp.onclick = () => openPreco(w);
+}
+function openPreco(w){
+  openSheet(`<h2>Preço pago</h2><div class="meta">${esc(nomeCompleto(w))} ${esc(w.safra||"")}${w.ficha && w.ficha.precoEstimado ? " · estimativa de mercado: " + esc(w.ficha.precoEstimado) : ""}</div>
+    <div class="grid2"><div class="field"><label for="p_preco">Preço por garrafa (R$)</label><input id="p_preco" inputmode="decimal" placeholder="299,00" autofocus></div>
+    <div class="field"><label for="p_loja">Loja</label><input id="p_loja" value="${esc(w.loja||"")}"></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="p_ok">Salvar</button><button class="btn" id="p_cancel">Cancelar</button></div>`);
+  $("#p_cancel").onclick = () => openDetail(w.id);
+  $("#p_ok").onclick = async () => {
+    const v = $("#p_preco").value.trim(); if (!v){ toast("Informe o valor."); return; }
+    $("#p_ok").disabled = true;
+    try { await state.db.doc("vinhos/"+w.id).update({ preco:v, loja:$("#p_loja").value.trim() }); toast("Preço salvo."); openDetail(w.id); }
+    catch(e){ toast(dbErr(e)); $("#p_ok").disabled = false; }
+  };
 }
 function pesquisaLabel(w){
   const p = w.pesquisa; if (!p) return "Nenhum pedido feito.";
