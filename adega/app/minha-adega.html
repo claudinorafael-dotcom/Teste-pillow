@@ -403,7 +403,11 @@ async function identificar(file){
     if (d && typeof d === "object"){ fillForm(d); st.textContent = "Rótulo lido. Confira os campos."; }
     else st.textContent = "Não consegui ler. Digite os dados.";
   } catch(e){
-    st.textContent = e.code === "not_granted" ? "Leitura de rótulo não autorizada." : e.code === "rate_limited" ? "Muitas leituras seguidas. Aguarde um pouco." : "Não consegui ler o rótulo. Tente outra foto ou digite.";
+    const code = e && e.code || "desconhecido";
+    const msgs = { not_granted:"Leitura de rótulo não autorizada nesta página.", rate_limited:"Muitas leituras seguidas. Aguarde um minuto.", image_rejected:"Foto recusada (tipo ou tamanho). Tente outra.", images_unavailable:"Este aparelho não envia fotos ao Claude.", invalid_json:"O Claude leu, mas respondeu fora do formato.", refused:"O Claude recusou esta imagem.", upstream_error:"Falha de conexão com o Claude.", cancelled:"Leitura cancelada." };
+    st.innerHTML = `${esc(msgs[code] || "Não consegui ler o rótulo.")} <span style="opacity:.7">(${esc(code)})</span> <button type="button" class="btn small" id="btnRetry">Tentar de novo</button>`;
+    console.error("identificar", code, e && e.message, e && e.text);
+    const r = $("#btnRetry"); if (r) r.onclick = () => identificar(file);
   }
 }
 
