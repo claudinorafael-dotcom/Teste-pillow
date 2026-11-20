@@ -693,23 +693,36 @@ async function confirmDelete(w){
 }
 
 /* ---------- identify by label ---------- */
+/* The model sometimes wraps the JSON in prose or a code fence; pull the first {...} block out and parse it. */
+function parseJsonLoose(text){
+  if (!text) return null;
+  let t = String(text).replace(/```(?:json)?/gi, "").trim();
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a < 0 || b <= a) return null;
+  t = t.slice(a, b + 1);
+  try { return JSON.parse(t); } catch {}
+  try { return JSON.parse(t.replace(/,\s*([}\]])/g, "$1").replace(/[\u201c\u201d]/g, '"')); } catch {}
+  return null;
+}
 async function identificar(file, opts = {}){
   if (!file) return;
   const prefix = opts.prefix || "f_";
   const st = $(opts.status || "#fotoStatus"); st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
-  const prompt = `Esta é a foto do rótulo de uma garrafa de vinho. Identifique o vinho e responda APENAS com um objeto JSON com estas chaves (string vazia quando não souber): {"produtor":"","vinho":"","safra":"","tipo":"","denominacao":"","regiao":"","pais":"","uvas":"","tamanho":"750ml"}. "tipo" deve ser um de: Tinto, Branco, Rosé, Espumante, Doce, Fortificado. "safra" é o ano com 4 dígitos ou "NV". "vinho" é o nome da cuvée sem o produtor. Use o conhecimento que tiver sobre o produtor para preencher denominação, região, país e uvas mesmo que não estejam no rótulo. Exemplo: {"produtor":"Jacopo Biondi Santi","vinho":"Sassoalloro","safra":"2021","tipo":"Tinto","denominacao":"Toscana IGT","regiao":"Toscana, Maremma","pais":"Itália","uvas":"Sangiovese","tamanho":"750ml"}`;
+  const prompt = `Esta é a foto do rótulo de uma garrafa de vinho. Identifique o vinho e responda APENAS com um objeto JSON (sem texto antes ou depois, sem crases de código) com estas chaves (string vazia quando não souber): {"produtor":"","vinho":"","safra":"","tipo":"","denominacao":"","regiao":"","pais":"","uvas":"","tamanho":"750ml"}. "tipo" deve ser um de: Tinto, Branco, Rosé, Espumante, Doce, Fortificado. "safra" é o ano com 4 dígitos ou "NV". "vinho" é o nome da cuvée sem o produtor. Use o conhecimento que tiver sobre o produtor para preencher denominação, região, país e uvas mesmo que não estejam no rótulo. Exemplo: {"produtor":"Jacopo Biondi Santi","vinho":"Sassoalloro","safra":"2021","tipo":"Tinto","denominacao":"Toscana IGT","regiao":"Toscana, Maremma","pais":"Itália","uvas":"Sangiovese","tamanho":"750ml"}`;
   try {
     const small = await shrinkImage(file);
     const up = state.assets ? state.assets.upload(small).then(r => { state.pendingFoto = r.id; }).catch(() => {}) : Promise.resolve();
-    const d = await state.sample.json(prompt, { images:[small], modelTier:"default" });
+    const r = await state.sample(prompt, { images:[small], modelTier:"default", cache:false });
     await up;
+    const d = parseJsonLoose(r && r.text);
     if (d && typeof d === "object"){ fillForm(d, prefix); st.textContent = "Rótulo lido. Confira os campos."; }
-    else st.textContent = "Não consegui ler. Digite os dados.";
+    else throw { code:"invalid_json", text: r && r.text };
     saveDraft(prefix);
   } catch(e){
     const code = e && e.code || "desconhecido";
     const msgs = { not_granted:"Leitura de rótulo não autorizada nesta página.", rate_limited:"Muitas leituras seguidas. Aguarde um minuto.", image_rejected:"Foto recusada (tipo ou tamanho). Tente outra.", images_unavailable:"Este aparelho não envia fotos ao Claude.", invalid_json:"O Claude leu, mas respondeu fora do formato.", refused:"O Claude recusou esta imagem.", upstream_error:"Falha de conexão com o Claude.", cancelled:"Leitura cancelada." };
-    st.innerHTML = `${esc(msgs[code] || "Não consegui ler o rótulo.")} <span style="opacity:.7">(${esc(code)})</span> <button type="button" class="btn small" id="btnRetry">Tentar de novo</button>`;
+    const raw = code === "invalid_json" && e.text ? ` <span style="opacity:.7">Resposta: “${esc(String(e.text).slice(0, 160))}”</span>` : "";
+    st.innerHTML = `${esc(msgs[code] || "Não consegui ler o rótulo.")} <span style="opacity:.7">(${esc(code)})</span>${raw} <button type="button" class="btn small" id="btnRetry">Tentar de novo</button>`;
     console.error("identificar", code, e && e.message, e && e.text);
     const r = $("#btnRetry"); if (r) r.onclick = () => identificar(file, opts);
   }
