@@ -7,6 +7,7 @@
   --bg:#f6f5f2; --surface:#ffffff; --surface2:#eeece7; --fg:#1d1b19; --muted:#6b6660; --line:#dcd8d1;
   --accent:#7a1f3d; --accent-fg:#ffffff; --accent-soft:#f3e3e9;
   --ok:#2f7a4a; --ok-soft:#e1f0e6; --warn:#a86a0f; --warn-soft:#f7ebd3; --bad:#9e2b2b; --bad-soft:#f6dede; --hold:#3b5b8a; --hold-soft:#e0e8f3;
+  --t-rose:#b7376b; --t-rose-soft:#fbe1ec; --t-branco:#4f7f2a; --t-branco-soft:#e8f2dc; --t-esp:#8f7416; --t-esp-soft:#f8f0d2; --t-doce:#8a4f14; --t-doce-soft:#f5e6d6;
   --display:"Fraunces",Georgia,"Times New Roman",serif; --body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r:12px;
 }
@@ -14,11 +15,13 @@
   --bg:#141312; --surface:#1e1c1a; --surface2:#262320; --fg:#ece8e1; --muted:#a39d94; --line:#36322e;
   --accent:#c9496f; --accent-fg:#1a0a10; --accent-soft:#3a1f29;
   --ok:#6cc48a; --ok-soft:#1d3326; --warn:#e0a53a; --warn-soft:#3a2d14; --bad:#e26a6a; --bad-soft:#3d1f1f; --hold:#7fa3d6; --hold-soft:#1e2a3a;
+  --t-rose:#f08ab4; --t-rose-soft:#3d1c2b; --t-branco:#a8d47e; --t-branco-soft:#22311a; --t-esp:#e6c75a; --t-esp-soft:#3a3214; --t-doce:#e0a46a; --t-doce-soft:#3a2816;
   color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#141312; --surface:#1e1c1a; --surface2:#262320; --fg:#ece8e1; --muted:#a39d94; --line:#36322e;
   --accent:#c9496f; --accent-fg:#1a0a10; --accent-soft:#3a1f29;
   --ok:#6cc48a; --ok-soft:#1d3326; --warn:#e0a53a; --warn-soft:#3a2d14; --bad:#e26a6a; --bad-soft:#3d1f1f; --hold:#7fa3d6; --hold-soft:#1e2a3a;
+  --t-rose:#f08ab4; --t-rose-soft:#3d1c2b; --t-branco:#a8d47e; --t-branco-soft:#22311a; --t-esp:#e6c75a; --t-esp-soft:#3a3214; --t-doce:#e0a46a; --t-doce-soft:#3a2816;
   color-scheme:dark }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -58,6 +61,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.hold{background:var(--hold-soft);color:var(--hold)} .pill.young{background:var(--hold-soft);color:var(--hold);border:1px dashed var(--hold)} .pill.none{background:var(--surface2);color:var(--muted)}
 .pill.tipo{background:var(--accent-soft);color:var(--accent)}
+.pill.tipo.t-rose{background:var(--t-rose-soft);color:var(--t-rose)} .pill.tipo.t-branco{background:var(--t-branco-soft);color:var(--t-branco)}
+.pill.tipo.t-esp{background:var(--t-esp-soft);color:var(--t-esp)} .pill.tipo.t-doce{background:var(--t-doce-soft);color:var(--t-doce)}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 18px;text-align:center;color:var(--muted)}
 .empty b{color:var(--fg)}
 .fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-fg);border:0;border-radius:999px;padding:14px 20px;font-weight:700;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer;z-index:20}
@@ -199,6 +204,8 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
       <option value="nome">Ordenar: nome</option>
       <option value="safra">Ordenar: safra</option>
       <option value="recentes">Ordenar: adicionados recentemente</option>
+      <option value="precoDesc">Ordenar: preço, maior primeiro</option>
+      <option value="precoAsc">Ordenar: preço, menor primeiro</option>
     </select>
   </div>
   <div class="chips" id="tipoChips" style="margin-bottom:12px">
@@ -297,6 +304,13 @@ function notasCurtas(w){
   const n = w.ficha && w.ficha.notas; if (!n) return "";
   return SCORE_KEYS.filter(([k]) => n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("");
 }
+/* price as a number: paid price first, else the first figure of the market estimate; null when unknown */
+function precoNum(w){
+  const n = (t, reais) => { if (!t) return null; const m = String(t).replace(/\.(?=\d{3})/g, "").replace(",", ".").match(reais ? /R\$\s?(\d+(?:\.\d+)?)/ : /\d+(?:\.\d+)?/); return m ? Number(reais ? m[1] : m[0]) : null; };
+  return n(w.preco, false) ?? n(w.ficha && w.ficha.precoEstimado, true);
+}
+function tipoClass(t){ return ({ "Rosé":"t-rose", "Branco":"t-branco", "Espumante":"t-esp", "Doce":"t-doce", "Fortificado":"t-doce" })[t] || ""; }
+function nomeCard(w){ const c = (t) => String(t||"").replace(/\s*\([^)]*\)/g, "").trim(); return [c(w.produtor), c(w.vinho)].filter(Boolean).join(" · "); }
 function precoCurto(w){
   if (w.preco) return `<span class="pr">Pago R$ ${esc(w.preco)}</span>`;
   const e = w.ficha && w.ficha.precoEstimado; if (!e) return "";
@@ -321,6 +335,7 @@ function filtered(){
     if (state.sort === "nome") return nomeCompleto(x).localeCompare(nomeCompleto(y));
     if (state.sort === "safra") return (Number(x.safra)||0) - (Number(y.safra)||0);
     if (state.sort === "recentes") return (y.criadoEm||"").localeCompare(x.criadoEm||"");
+    if (state.sort === "precoDesc" || state.sort === "precoAsc"){ const px = precoNum(x), py = precoNum(y); if (px === null && py === null) return 0; if (px === null) return 1; if (py === null) return -1; return state.sort === "precoDesc" ? py - px : px - py; }
     const jx = janela(x), jy = janela(y);
     if (rank[jx.k] !== rank[jy.k]) return rank[jx.k] - rank[jy.k];
     return (jx.b||9999) - (jy.b||9999);
@@ -349,13 +364,13 @@ function renderList(){
   }
   list.innerHTML = arr.map(w => {
     const j = janela(w);
-    const sub = [w.denominacao, w.regiao || w.pais, w.uvas].filter(Boolean).join(" · ");
+    const sub = w.denominacao || w.regiao || w.pais || "";
     return `<div class="card" data-id="${esc(w.id)}" role="button" tabindex="0">
-      <div class="name">${w.fotoId ? `<img class="thumb" src="${esc(blobUrl(w.fotoId))}" alt="" loading="lazy" decoding="async">` : ""}${esc(nomeCompleto(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></div>
+      <div class="name">${w.fotoId ? `<img class="thumb" src="${esc(blobUrl(w.fotoId))}" alt="" loading="lazy" decoding="async">` : ""}${esc(nomeCard(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></div>
       <div class="right"><span class="qty">${w.qtd|0} gf</span></div>
       <div class="state"><span class="pill ${j.k}">${esc(j.label)}</span>${j.a||j.b ? `<span class="win">janela ${j.a||"?"} a ${j.b||"?"}</span>` : ""}</div>
       <div class="sub">${esc(sub)}</div>
-      <div class="right"><span class="pill tipo">${esc(w.tipo||"")}</span></div>
+      <div class="right"><span class="pill tipo ${tipoClass(w.tipo)}">${esc(w.tipo||"")}</span></div>
       <div class="notas">${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div>
       <div class="right">${precoCurto(w)}</div>
     </div>`;
