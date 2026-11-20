@@ -228,13 +228,21 @@ const blobUrl = id => id ? "/_blob/" + encodeURIComponent(id) : "";
 /* Shrink a camera photo before upload/sending: phones produce 10+ MB JPEGs that exhaust memory when several are on screen. */
 async function shrinkImage(file, max = 1600){
   try {
-    const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
-    if (scale === 1 && file.size < 900000) { bmp.close(); return file; }
+    if (file.size < 900000) return file;
+    /* Read the pixel size from the header only (no full decode), then ask the browser to decode
+       straight into a small bitmap: a 12 MP phone photo never becomes a 50 MB bitmap in memory. */
+    const url = URL.createObjectURL(file);
+    const dims = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = rej; im.src = url; });
+    URL.revokeObjectURL(url);
+    const scale = Math.min(1, max / Math.max(dims.w, dims.h));
+    const opts = { imageOrientation: "from-image", resizeQuality: "high" };
+    if (scale < 1){ opts.resizeWidth = Math.round(dims.w * scale); opts.resizeHeight = Math.round(dims.h * scale); }
+    const bmp = await createImageBitmap(file, opts);
     const cv = document.createElement("canvas");
-    cv.width = Math.round(bmp.width * scale); cv.height = Math.round(bmp.height * scale);
-    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height); bmp.close();
+    cv.width = bmp.width; cv.height = bmp.height;
+    cv.getContext("2d").drawImage(bmp, 0, 0); bmp.close();
     const blob = await new Promise(res => cv.toBlob(res, "image/jpeg", 0.85));
+    cv.width = cv.height = 0;
     return blob ? new File([blob], (file.name || "foto").replace(/\.\w+$/, "") + ".jpg", { type:"image/jpeg" }) : file;
   } catch { return file; }
 }
@@ -420,7 +428,7 @@ function openForm(w){
   const isEdit = !!(w && w.id);
   if (isEdit ? !state.assets : (!state.sample || !state.canImages)) btnFoto.hidden = true;
   btnFoto.onclick = () => foto.click();
-  foto.onchange = () => isEdit ? guardarFoto(foto.files[0]) : identificar(foto.files[0]);
+  foto.onchange = async () => { const f = foto.files[0]; foto.value = ""; await (isEdit ? guardarFoto(f) : identificar(f)); };
   if (isEdit) $("#btnDelete").onclick = () => confirmDelete(w);
   $("#wform").onsubmit = async (e) => {
     e.preventDefault();
@@ -824,7 +832,7 @@ function openProvadoForm(c, w){
   const fr = $("#c_foto_rotulo"), br = $("#c_btn_rotulo");
   if (!state.sample || !state.canImages) br.hidden = true;
   br.onclick = () => fr.click();
-  fr.onchange = () => identificar(fr.files[0]);
+  fr.onchange = async () => { const f = fr.files[0]; fr.value = ""; await identificar(f); };
   const fl = $("#c_foto_lugar"), bl = $("#c_btn_lugar");
   if (!state.assets) bl.hidden = true;
   bl.onclick = () => fl.click();
@@ -893,7 +901,7 @@ $("#list").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.close
 $("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } state.view === "provados" ? openProvadoForm(null, null) : openForm(null); };
 /* Pesquisa view wiring */
 $("#q_btn_foto").onclick = () => $("#q_foto").click();
-$("#q_foto").onchange = () => identificar($("#q_foto").files[0], { prefix:"q_", status:"#q_fotoStatus" });
+$("#q_foto").onchange = async () => { const el = $("#q_foto"); const f = el.files[0]; el.value = ""; await identificar(f, { prefix:"q_", status:"#q_fotoStatus" }); };
 $("#q_clear").onclick = () => { $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
 $("#qform").onsubmit = (e) => { e.preventDefault(); avaliarCompra(); };
 $("#qlist").onclick = (e) => { const c = e.target.closest(".card"); if (c) openPesquisaDetail(c.dataset.id); };
