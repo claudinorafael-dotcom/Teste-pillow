@@ -495,7 +495,6 @@ function renderResultado(p, host){
   }
   host.innerHTML = `<div class="sec">
     <div class="row" style="justify-content:space-between">${veredPill((vf||r).veredito)}<span class="note">${vf ? "Verificado na internet pelo Claude" : "Veredito imediato, sem pesquisa na internet"}</span></div>
-    ${vf && r.veredito && r.veredito !== vf.veredito ? `<div class="note" style="margin-top:6px">Veredito imediato anterior: ${veredPill(r.veredito)} <span>(sem identificar o produtor; substituído pela verificação)</span></div>` : ""}
     <h2 style="margin:8px 0 2px">${esc([p.produtor,p.vinho].filter(Boolean).join(" · "))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></h2>
     <div class="meta">Pedido: R$ ${esc(p.precoPedido)}${p.loja ? " em " + esc(p.loja) : ""} · Preço justo: ${esc((vf||r).precoJusto || (vf && vf.precoMercado) || "?")}</div>
     <div style="font-weight:600;margin:6px 0">${esc((vf||r).titulo||"")}</div>
