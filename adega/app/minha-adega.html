@@ -443,9 +443,8 @@ function openForm(w){
       } else {
         d.criadoEm = new Date().toISOString(); d.ficha = null; d.pesquisa = { status:"pendente", pedidoEm:new Date().toISOString() };
         const ref = await state.db.collection("vinhos").add(d);
-        closeSheet(); toast("Adicionada. Gerando ficha…");
+        closeSheet(); toast("Adicionada. Pedindo a ficha ao Claude…");
         pedirPesquisa(ref.id, d);
-        gerarFicha({...d, id:ref.id}, true);
       }
     } catch(err){ toast(dbErr(err)); $("#btnSave").disabled = false; }
   };
@@ -520,12 +519,12 @@ async function pedirVerificacao(p){
   const ref = state.db.doc("pesquisas/"+p.id);
   const fail = async (why) => { toast(why); try { await ref.update({ status:"pendente", motivo:why }); } catch {} };
   const text = `Avaliar compra: ${[p.produtor,p.vinho].filter(Boolean).join(" · ")} ${p.safra||""} por R$ ${p.precoPedido}${p.loja ? " em " + p.loja : ""}. Pesquisar notas de terceiros e preço de mercado no Brasil e dar o veredito. Documento pesquisas/${p.id}.`;
+  const t = await viaTarefa(text);
+  if (t.ok){ await ref.update({ status:"solicitada", via:"tarefa", motivo:"" }); toast("Pesquisa disparada. O veredito chega aqui em alguns minutos."); return; }
   const c = await viaComentario($("#qlist"), text);
   if (c.ok){ await ref.update({ status:"solicitada", via:"comentario", threadId:c.threadId, motivo:"" }); toast("Pedido enviado. A resposta chega aqui mesmo."); return; }
   if (c.stop) return fail(c.why + ". Aguarde um minuto e reenvie.");
-  const t = await viaTarefa(text);
-  if (t.ok){ await ref.update({ status:"solicitada", via:"tarefa", motivo:"" }); toast("Pesquisa disparada. O veredito chega aqui em alguns minutos."); return; }
-  return fail(`Não consegui acionar o Claude (${c.why}; ${t.why}). Toque em Reenviar.`);
+  return fail(`Não consegui acionar o Claude (${t.why}; ${c.why}). Toque em Reenviar.`);
 }
 function renderPesquisas(){
   const list = $("#qlist"); if (!list) return;
@@ -551,9 +550,9 @@ function pedidoTexto(id, w){
   return `Pesquisar avaliações de terceiros, preço de mercado${w.fotoId ? "" : " e foto do rótulo"} para: ${nomeCompleto(w)} ${w.safra||""} (${[w.tipo,w.denominacao,w.regiao,w.pais].filter(Boolean).join(", ")}). Documento vinhos/${id}.`;
 }
 /* Two ways to reach Claude, tried in order:
-   1. comment "sent to Claude" (wakes the conversation that built this page; replies land in the thread);
-   2. the on-demand scheduled task "Adega: pesquisa sob demanda" (a fresh Claude session), fired through the
-      viewer's Claude Code Remote connector. Independent of any open conversation. */
+   1. the on-demand scheduled task "Adega: pesquisa sob demanda" (a fresh Claude session that reads only the
+      protocol), fired through the viewer's Claude Code Remote connector. Independent of any open conversation;
+   2. fallback: comment "sent to Claude" (wakes the conversation that built this page; replies land in the thread). */
 const TRIGGER_ID = "trig_01YRvMoRnB9F7ygo8BX57J46";
 async function viaComentario(anchorEl, text){
   if (!state.comments) return { ok:false, why:"comentários indisponíveis" };
@@ -583,12 +582,12 @@ async function pedirPesquisa(id, w, manual){
   const ref = state.db.doc("vinhos/"+id);
   const fail = async (why) => { if (manual) toast(why); try { await ref.update({ pesquisa:{ status:"pendente", pedidoEm:new Date().toISOString(), motivo:why } }); } catch {} };
   const text = pedidoTexto(id, w);
+  const t = await viaTarefa(text);
+  if (t.ok){ await ref.update({ pesquisa:{ status:"solicitada", via:"tarefa", pedidoEm:new Date().toISOString() } }); toast("Pesquisa disparada. A ficha chega em alguns minutos."); return; }
   const c = await viaComentario($("#list"), text);
   if (c.ok){ await ref.update({ pesquisa:{ status:"solicitada", via:"comentario", pedidoEm:new Date().toISOString(), threadId:c.threadId } }); toast("Pedido de pesquisa enviado ao Claude."); return; }
   if (c.stop) return fail(c.why + ". Fica pendente; reenvie em um minuto.");
-  const t = await viaTarefa(text);
-  if (t.ok){ await ref.update({ pesquisa:{ status:"solicitada", via:"tarefa", pedidoEm:new Date().toISOString() } }); toast("Pesquisa disparada. O resultado chega na ficha em alguns minutos."); return; }
-  return fail(`Não consegui acionar o Claude (${c.why}; ${t.why}). Fica pendente: reenvie pela ficha.`);
+  return fail(`Não consegui acionar o Claude (${t.why}; ${c.why}). Fica pendente: reenvie pela ficha.`);
 }
 function dbErr(e){
   const c = e && e.code;
@@ -637,14 +636,14 @@ Regras: anos como números. Em "notas", só preencha quando tiver confiança raz
 async function gerarFicha(w, auto){
   if (!state.sample) { if(!auto) toast("Geração de ficha indisponível aqui."); return; }
   try {
-    const f = await state.sample.json(fichaPrompt(w), { modelTier:"complex", cache:false });
+    const f = await state.sample.json(fichaPrompt(w), { modelTier:"default", cache:false });
     if (!f || typeof f !== "object") throw {code:"invalid_json"};
     f.atualizadoEm = new Date().toISOString();
     await state.db.doc("vinhos/"+w.id).update({ ficha:f });
     toast(`Ficha pronta: ${nomeCompleto(w)}`);
     if ($("#sheet") && $("#sheet").dataset.id === w.id) openDetail(w.id);
   } catch(e){
-    const msg = e.code === "not_granted" ? "Ficha não gerada: uso do Claude não autorizado nesta página." : e.code === "rate_limited" ? "Muitas fichas seguidas. Tente de novo em instantes." : "Não consegui gerar a ficha agora. Abra a garrafa e toque em Gerar ficha.";
+    const msg = e.code === "not_granted" ? "Ficha não gerada: uso do Claude não autorizado nesta página." : e.code === "rate_limited" ? "Muitas fichas seguidas. Tente de novo em instantes." : "Não consegui gerar a ficha provisória agora.";
     toast(msg);
   }
 }
@@ -704,14 +703,14 @@ function openDetail(id){
   </div></div>
   ${hist.length ? `<div class="sec"><h3>Histórico</h3><div class="hist">${hist.map(c => `<div><span>${esc(c.data||"")}${c.nota ? " · nota " + esc(c.nota) : ""}</span><span style="color:var(--muted);text-align:right">${esc(c.comentario||"")}</span></div>`).join("")}</div></div>` : ""}
   <div class="row" style="margin-top:8px">
-    <button class="btn" id="btnFicha" ${state.sample ? "" : "disabled"}>${f ? "Atualizar ficha" : "Gerar ficha"}</button>
+    ${f ? "" : `<button class="btn" id="btnFicha" ${state.sample ? "" : "disabled"}>Ficha provisória (sem pesquisa)</button>`}
     <span class="note" id="fichaStatus"></span>
   </div>`;
   openSheet(html);
   $("#sheet").dataset.id = id;
   $("#btnClose").onclick = closeSheet;
   $("#btnEdit").onclick = () => openForm(w);
-  $("#btnFicha").onclick = async () => { $("#btnFicha").disabled = true; $("#fichaStatus").innerHTML = `<span class="spin"></span>Consultando…`; await gerarFicha(w, false); if ($("#btnFicha")) $("#btnFicha").disabled = false; if ($("#fichaStatus")) $("#fichaStatus").textContent = ""; };
+  const bf = $("#btnFicha"); if (bf) bf.onclick = async () => { $("#btnFicha").disabled = true; $("#fichaStatus").innerHTML = `<span class="spin"></span>Consultando…`; await gerarFicha(w, false); if ($("#btnFicha")) $("#btnFicha").disabled = false; if ($("#fichaStatus")) $("#fichaStatus").textContent = ""; };
   const bebi = $("#btnBebi"); if (bebi) bebi.onclick = () => openBebi(w);
   const pq = $("#btnPesq"); if (pq) pq.onclick = async () => { pq.disabled = true; await pedirPesquisa(w.id, w, true); };
   const bp = $("#btnPreco"); if (bp) bp.onclick = () => openPreco(w);
@@ -732,7 +731,7 @@ function openPreco(w){
 function pesquisaLabel(w){
   const p = w.pesquisa; if (!p) return "Nenhum pedido feito.";
   if (p.status === "feita") return `Feita em ${(p.feitaEm||"").slice(0,10)}.`;
-  if (p.status === "solicitada") return `Pedido enviado em ${(p.pedidoEm||"").slice(0,10)}, aguardando resposta.`;
+  if (p.status === "solicitada") return `Pedido enviado em ${(p.pedidoEm||"").slice(0,10)}. A ficha completa (notas, janela, preço) chega em alguns minutos.`;
   return `Pendente${p.motivo ? ": " + p.motivo : ""}`;
 }
 function openBebi(w){ openProvadoForm(null, w); }

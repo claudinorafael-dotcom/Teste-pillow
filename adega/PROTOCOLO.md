@@ -12,33 +12,44 @@ Banco: coleções `vinhos`, `consumos` e `pesquisas` (ArtifactData). Fotos: asse
 
 ## Quando a sessão do Claude é acordada
 
-1. Por um comentário "Pesquisar avaliações…" ou "Avaliar compra…" vindo da página (`comments.sendToClaude`), ou
-2. Pela tarefa sob demanda "Adega: pesquisa sob demanda" (trig_01YRvMoRnB9F7ygo8BX57J46), disparada pelo próprio app
-   via conector Claude Code Remote (`fire_trigger`) quando o caminho 1 não está disponível. Sem agendamento por relógio:
-   só roda quando há algo novo.
-Em qualquer caso, consultar **todos** os documentos pendentes de `vinhos` e `pesquisas`, não só o citado no comentário.
+1. Pela tarefa sob demanda "Adega: pesquisa sob demanda" (trig_01YRvMoRnB9F7ygo8BX57J46), disparada pelo próprio app
+   via conector Claude Code Remote (`fire_trigger`) a cada garrafa ou pedido novo. É o caminho principal: cada disparo
+   nasce numa sessão limpa que carrega só este protocolo (prompt autossuficiente na tarefa). Sem agendamento por relógio.
+2. Como reserva, por um comentário "Pesquisar avaliações…" ou "Avaliar compra…" (`comments.sendToClaude`), que acorda
+   a conversa que construiu a página.
+Em qualquer caso, consultar **todos** os documentos pendentes de `vinhos` e `pesquisas`, não só o citado.
 
-## Pesquisa em paralelo (modo padrão)
+## Orçamento de tokens (decisão de 20/11/2026)
 
-Para cada vinho, disparar três subagentes ao mesmo tempo (Agent, `run_in_background: true`) e só depois consolidar:
+A primeira versão usava três subagentes em paralelo por vinho (cerca de 350 mil tokens por garrafa). Agora:
 
-| Agente | O que busca | Fontes |
-|---|---|---|
-| **críticos** | nota da safra exata; se só houver safras vizinhas, dizer isso; janela de consumo publicada | James Suckling (`suckling`), Wine Advocate/Parker (`parker`), Wine Spectator (`spectator`), Decanter (`decanter`), Vinous/Galloni/Neal Martin (`vinous`), Tim Atkin (`atkin`), Descorchados (`descorchados`); também Jancis Robinson, Falstaff, Jeb Dunnuck como apoio |
-| **comunidade** | nota e nº de avaliações | Vivino (`vivino`, 1–5; buscar também por produtor + uva, o Vivino às vezes omite o nome da linha), CellarTracker (`cellartracker`, média) |
-| **mercado** | preço no Brasil (faixa, loja, mês/ano) e, só se `fotoId` vazio, uma imagem do rótulo | Mistral, Grand Cru, World Wine, Evino, Wine.com.br, Magazine Luiza, Oba; preço no exterior como referência |
+- **Um único subagente por vinho**, modelo Sonnet (`model: "sonnet"`), no máximo 12 buscas e 4 aberturas de página.
+  A sessão principal só consolida e grava.
+- **Sites que bloqueiam** (nunca abrir; usar o trecho da busca e marcar "via busca, não conferido"): Wine Enthusiast,
+  James Suckling, Wine Advocate, Decanter (nota em paywall), Wine Spectator, CellarTracker, Wine-Searcher, Wine.com,
+  Mercado Livre, Mistral, Grand Cru, World Wine. Vivino: tentar abrir uma vez. Descorchados, Pão de Açúcar, Evino: abrir.
+- **O celular não gera mais ficha**: o app só lê o rótulo (modelo padrão) e pede a pesquisa. A ficha completa
+  (resumo, estilo, uvas, vinificação, janela, harmonização, notas, preço) é escrita pela pesquisa. Há um botão
+  "Ficha provisória (sem pesquisa)" na garrafa, modelo padrão, só para emergência.
+- Sem atalho por perfil de vinho: todas as fontes são buscadas para toda garrafa (pedido do Rafael).
 
-Chaves entre parênteses são as de `ficha.notas` / `verificada.notas`.
-Sites que bloqueiam (Vivino direto, Wine-Searcher): usar o que a busca mostra e marcar "via agregador, não conferido".
+O que o subagente pede, numa única rodada: (a) notas da safra exata ou vizinhas em Suckling (`suckling`),
+Wine Advocate (`parker`), Wine Spectator (`spectator`), Decanter (`decanter`), Vinous (`vinous`), Tim Atkin (`atkin`),
+Descorchados (`descorchados`), Wine Enthusiast (só em `fontes`); (b) Vivino (`vivino`, 1–5, também produtor + uva) e
+CellarTracker (`cellartracker`); (c) preço no Brasil (loja, R$, mês/ano) e no exterior; (d) produtor, uvas, vinificação,
+janela publicada; (e) imagem do rótulo só se `fotoId` vazio.
 
 ## Para cada vinho pendente em `vinhos`
 
-Gravar com `ArtifactData update` (pinar `if_version`):
+Gravar com `ArtifactData update` (pinar `if_version`) a ficha **completa** (o celular não a gera mais):
+- `ficha.resumo`, `estilo`, `uvas`, `vinificacao`, `estadoHoje`, `safraComentario`, `decantar`, `temperatura`,
+  `harmonizacao`, `confianca`, `observacoes`, `atualizadoEm`,
 - `ficha.notas` (null onde não houver), `ficha.fontes` (lista "Fonte nota (safra)"),
 - `ficha.precoEstimado` ("R$ x a y (loja, mês/ano)"),
 - `ficha.janelaInicio/janelaFim/apice` (preferir janela de crítico; o app usa o ápice para "Pronto para beber"),
 - `ficha.verificadaEm` (ISO), `pesquisa: {status:"feita", feitaEm}`.
-Não sobrescrever `resumo`, `harmonizacao`, `decantar` a menos que estejam errados.
+Se já houver ficha, não sobrescrever `resumo`, `harmonizacao`, `decantar` a menos que estejam errados.
+Corrigir `produtor`/`uvas` do documento quando a leitura do rótulo tiver errado (ex.: Barbanera lido como Barbera).
 Foto: baixar para o scratchpad em pasta própria, reduzir a ≤1200 px, subir com `Artifact publish asset:true`, gravar o `id` em `fotoId`.
 Se houver `pesquisa.threadId`, responder no thread (ArtifactComments) em 3 a 5 linhas (notas, janela, preço) e resolver.
 
