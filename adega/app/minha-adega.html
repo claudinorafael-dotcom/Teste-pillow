@@ -465,24 +465,34 @@ async function avaliarCompra(){
   const q = { produtor:v("q_produtor"), vinho:v("q_vinho"), safra:v("q_safra"), tipo:v("q_tipo"), denominacao:v("q_denominacao"), regiao:v("q_regiao"), pais:v("q_pais"), uvas:v("q_uvas"), precoPedido:v("q_preco"), loja:v("q_loja") };
   if (!q.produtor && !q.vinho){ toast("Informe o vinho ou fotografe o rótulo."); return; }
   if (!q.precoPedido){ toast("Informe o preço pedido."); return; }
-  if (!state.sample){ toast("Claude indisponível nesta visualização."); return; }
-  $("#q_ok").disabled = true; $("#q_status").innerHTML = `<span class="spin"></span>Avaliando…`;
+  $("#q_ok").disabled = true; $("#q_status").innerHTML = `<span class="spin"></span>Enviando…`;
   $("#q_result").innerHTML = "";
   try {
-    const r = await state.sample.json(pesquisaPrompt(q), { modelTier:"complex", cache:false });
-    if (!r || typeof r !== "object") throw {code:"invalid_json"};
-    const doc = { ...q, fotoId: state.pendingFoto || "", rapida: r, verificada: null, status:"rapida", criadoEm:new Date().toISOString() };
+    const doc = { ...q, fotoId: state.pendingFoto || "", rapida: null, verificada: null, status:"pendente", criadoEm:new Date().toISOString() };
     const ref = await state.db.collection("pesquisas").add(doc);
-    $("#q_status").textContent = "";
+    const p = { ...doc, id: ref.id };
     state.lastResultId = ref.id;
-    renderResultado({ ...doc, id: ref.id }, $("#q_result"));
+    $("#q_status").textContent = "";
+    renderResultado(p, $("#q_result"));
+    await pedirVerificacao(p);
   } catch(e){
-    $("#q_status").textContent = e.code === "not_granted" ? "Uso do Claude não autorizado." : e.code === "rate_limited" ? "Muitas consultas seguidas. Aguarde." : e.code === "invalid_json" ? "Resposta fora do formato. Tente de novo." : "Não consegui avaliar agora.";
+    $("#q_status").textContent = dbErr(e);
   } finally { $("#q_ok").disabled = false; }
 }
 function notasLinha(n){ if (!n) return ""; return SCORE_KEYS.filter(([k]) => n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("") || `<span class="nt none">sem notas</span>`; }
 function renderResultado(p, host){
   const r = p.rapida || {}, vf = p.verificada;
+  if (!vf){
+    const nome = [p.produtor,p.vinho].filter(Boolean).join(" · ");
+    host.innerHTML = `<div class="sec">
+      <div class="row" style="justify-content:space-between"><span class="pill hold">${p.status === "solicitada" ? "Pesquisando…" : "Pendente"}</span><span class="note">${esc((p.criadoEm||"").slice(0,10))}</span></div>
+      <h2 style="margin:8px 0 2px">${esc(nome)} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></h2>
+      <div class="meta">Pedido: R$ ${esc(p.precoPedido)}${p.loja ? " em " + esc(p.loja) : ""}</div>
+      <div class="note">${p.status === "solicitada" ? "Pedido enviado ao Claude. A resposta verificada (notas, preço de mercado e veredito) aparece aqui em alguns minutos, sem precisar recarregar." : "O pedido ainda não chegou ao Claude" + (p.motivo ? ": " + esc(p.motivo) : ".")}</div>
+      <div class="row" style="margin-top:12px">${p.status === "solicitada" ? "" : `<button class="btn small" id="q_verif">Reenviar pedido</button>`}</div></div>`;
+    const bv = $("#q_verif", host); if (bv) bv.onclick = () => pedirVerificacao(p);
+    return;
+  }
   host.innerHTML = `<div class="sec">
     <div class="row" style="justify-content:space-between">${veredPill((vf||r).veredito)}<span class="note">${vf ? "Verificado na internet pelo Claude" : "Veredito imediato, sem pesquisa na internet"}</span></div>
     ${vf && r.veredito && r.veredito !== vf.veredito ? `<div class="note" style="margin-top:6px">Veredito imediato anterior: ${veredPill(r.veredito)} <span>(sem identificar o produtor; substituído pela verificação)</span></div>` : ""}
@@ -494,23 +504,26 @@ function renderResultado(p, host){
     <div class="notas" style="margin-top:8px">${notasLinha(vf ? vf.notas : r.notasConhecidas)}</div>
     ${vf && vf.fontes ? `<div class="note" style="margin-top:6px">Fontes: ${vf.fontes.map(esc).join("; ")}</div>` : `<div class="note" style="margin-top:6px">Confiança: ${esc(r.confianca||"?")}. Notas e preço são da memória do Claude; para confirmar, peça a verificação.</div>`}
     <div class="row" style="margin-top:12px">
-      ${vf ? "" : (p.status === "solicitada" ? `<span class="note">Verificação pedida, aguardando resposta.</span>` : `<button class="btn small" id="q_verif">Pedir verificação na internet</button>`)}
       <button class="btn small" id="q_add">Comprei: adicionar à adega</button>
     </div></div>`;
   const bv = $("#q_verif", host); if (bv) bv.onclick = () => pedirVerificacao(p);
   const ba = $("#q_add", host); if (ba) ba.onclick = () => { closeSheet(); setView("adega"); openForm(null); fillForm(p); $("#f_preco").value = p.precoPedido||""; $("#f_loja").value = p.loja||""; if (p.fotoId) state.pendingFoto = p.fotoId; };
 }
 async function pedirVerificacao(p){
-  if (!state.comments) { toast("Envio ao Claude indisponível aqui."); return; }
+  const fail = async (why) => { toast(why); try { await state.db.doc("pesquisas/"+p.id).update({ status:"pendente", motivo:why }); } catch {} };
+  if (!state.comments) return fail("Envio ao Claude indisponível nesta visualização.");
   try {
     const can = await state.comments.canSendToClaude();
-    if (can !== "available"){ toast(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora." : "Envio ao Claude indisponível."); return; }
+    if (can !== "available") return fail(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora. Toque em Reenviar mais tarde." : "Envio ao Claude indisponível aqui.");
     const anchor = await state.comments.anchorFor($("#qlist"));
     const text = `Avaliar compra: ${[p.produtor,p.vinho].filter(Boolean).join(" · ")} ${p.safra||""} por R$ ${p.precoPedido}${p.loja ? " em " + p.loja : ""}. Pesquisar notas de terceiros e preço de mercado no Brasil e dar o veredito. Documento pesquisas/${p.id}.`;
     const r = await state.comments.sendToClaude({ anchor, text });
-    await state.db.doc("pesquisas/"+p.id).update({ status:"solicitada", threadId:r.threadId });
-    toast("Verificação pedida. A resposta chega aqui mesmo.");
-  } catch(e){ toast(e.code === "rate_limited" ? "Muitos pedidos seguidos." : "Não consegui enviar o pedido."); }
+    await state.db.doc("pesquisas/"+p.id).update({ status:"solicitada", threadId:r.threadId, motivo:"" });
+    toast("Pedido enviado. A resposta chega aqui mesmo.");
+  } catch(e){
+    if (e.code === "consent_required" || e.code === "not_granted") return fail("Envio não autorizado. Autorize os comentários e toque em Reenviar.");
+    return fail(e.code === "rate_limited" ? "Muitos pedidos seguidos. Aguarde um minuto e reenvie." : "Não consegui enviar o pedido. Toque em Reenviar.");
+  }
 }
 function renderPesquisas(){
   const list = $("#qlist"); if (!list) return;
