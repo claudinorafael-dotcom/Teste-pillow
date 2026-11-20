@@ -50,7 +50,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .card:hover{border-color:var(--accent)}
 .card .name{font-family:var(--display);font-weight:600;font-size:18px;line-height:1.2;min-width:0;overflow-wrap:anywhere}
 .card .sub{color:var(--muted);font-size:13px;min-width:0;overflow-wrap:anywhere}
-.card .right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.card .right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0;max-width:45%}
+.card .state{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.card .state .pill{white-space:normal;text-align:left}
+.card .state .win{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 .card .qty{font-variant-numeric:tabular-nums;font-weight:600}
 .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.hold{background:var(--hold-soft);color:var(--hold)} .pill.young{background:var(--hold-soft);color:var(--hold);border:1px dashed var(--hold)} .pill.none{background:var(--surface2);color:var(--muted)}
@@ -349,7 +352,8 @@ function renderList(){
     const sub = [w.denominacao, w.regiao || w.pais, w.uvas].filter(Boolean).join(" · ");
     return `<div class="card" data-id="${esc(w.id)}" role="button" tabindex="0">
       <div class="name">${w.fotoId ? `<img class="thumb" src="${esc(blobUrl(w.fotoId))}" alt="" loading="lazy" decoding="async">` : ""}${esc(nomeCompleto(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></div>
-      <div class="right"><span class="qty">${w.qtd|0} gf</span><span class="pill ${j.k}">${esc(j.label)}${j.a||j.b ? ` ${j.a||"?"}–${j.b||"?"}` : ""}</span></div>
+      <div class="right"><span class="qty">${w.qtd|0} gf</span></div>
+      <div class="state"><span class="pill ${j.k}">${esc(j.label)}</span>${j.a||j.b ? `<span class="win">janela ${j.a||"?"} a ${j.b||"?"}</span>` : ""}</div>
       <div class="sub">${esc(sub)}</div>
       <div class="right"><span class="pill tipo">${esc(w.tipo||"")}</span></div>
       <div class="notas">${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div>
