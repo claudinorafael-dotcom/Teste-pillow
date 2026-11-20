@@ -510,20 +510,15 @@ function renderResultado(p, host){
   const ba = $("#q_add", host); if (ba) ba.onclick = () => { closeSheet(); setView("adega"); openForm(null); fillForm(p); $("#f_preco").value = p.precoPedido||""; $("#f_loja").value = p.loja||""; if (p.fotoId) state.pendingFoto = p.fotoId; };
 }
 async function pedirVerificacao(p){
-  const fail = async (why) => { toast(why); try { await state.db.doc("pesquisas/"+p.id).update({ status:"pendente", motivo:why }); } catch {} };
-  if (!state.comments) return fail("Envio ao Claude indisponível nesta visualização.");
-  try {
-    const can = await state.comments.canSendToClaude();
-    if (can !== "available") return fail(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora. Toque em Reenviar mais tarde." : "Envio ao Claude indisponível aqui.");
-    const anchor = await state.comments.anchorFor($("#qlist"));
-    const text = `Avaliar compra: ${[p.produtor,p.vinho].filter(Boolean).join(" · ")} ${p.safra||""} por R$ ${p.precoPedido}${p.loja ? " em " + p.loja : ""}. Pesquisar notas de terceiros e preço de mercado no Brasil e dar o veredito. Documento pesquisas/${p.id}.`;
-    const r = await state.comments.sendToClaude({ anchor, text });
-    await state.db.doc("pesquisas/"+p.id).update({ status:"solicitada", threadId:r.threadId, motivo:"" });
-    toast("Pedido enviado. A resposta chega aqui mesmo.");
-  } catch(e){
-    if (e.code === "consent_required" || e.code === "not_granted") return fail("Envio não autorizado. Autorize os comentários e toque em Reenviar.");
-    return fail(e.code === "rate_limited" ? "Muitos pedidos seguidos. Aguarde um minuto e reenvie." : "Não consegui enviar o pedido. Toque em Reenviar.");
-  }
+  const ref = state.db.doc("pesquisas/"+p.id);
+  const fail = async (why) => { toast(why); try { await ref.update({ status:"pendente", motivo:why }); } catch {} };
+  const text = `Avaliar compra: ${[p.produtor,p.vinho].filter(Boolean).join(" · ")} ${p.safra||""} por R$ ${p.precoPedido}${p.loja ? " em " + p.loja : ""}. Pesquisar notas de terceiros e preço de mercado no Brasil e dar o veredito. Documento pesquisas/${p.id}.`;
+  const c = await viaComentario($("#qlist"), text);
+  if (c.ok){ await ref.update({ status:"solicitada", via:"comentario", threadId:c.threadId, motivo:"" }); toast("Pedido enviado. A resposta chega aqui mesmo."); return; }
+  if (c.stop) return fail(c.why + ". Aguarde um minuto e reenvie.");
+  const t = await viaTarefa(text);
+  if (t.ok){ await ref.update({ status:"solicitada", via:"tarefa", motivo:"" }); toast("Pesquisa disparada. O veredito chega aqui em alguns minutos."); return; }
+  return fail(`Não consegui acionar o Claude (${c.why}; ${t.why}). Toque em Reenviar.`);
 }
 function renderPesquisas(){
   const list = $("#qlist"); if (!list) return;
@@ -548,21 +543,45 @@ function openPesquisaDetail(id){
 function pedidoTexto(id, w){
   return `Pesquisar avaliações de terceiros, preço de mercado${w.fotoId ? "" : " e foto do rótulo"} para: ${nomeCompleto(w)} ${w.safra||""} (${[w.tipo,w.denominacao,w.regiao,w.pais].filter(Boolean).join(", ")}). Documento vinhos/${id}.`;
 }
-async function pedirPesquisa(id, w, manual){
-  const fail = async (why) => { if (manual) toast(why); try { await state.db.doc("vinhos/"+id).update({ pesquisa:{ status:"pendente", pedidoEm:new Date().toISOString(), motivo:why } }); } catch {} };
-  if (!state.comments) return fail("Pedido guardado: o Claude pesquisa na próxima varredura.");
+/* Two ways to reach Claude, tried in order:
+   1. comment "sent to Claude" (wakes the conversation that built this page; replies land in the thread);
+   2. the on-demand scheduled task "Adega: pesquisa sob demanda" (a fresh Claude session), fired through the
+      viewer's Claude Code Remote connector. Independent of any open conversation. */
+const TRIGGER_ID = "trig_01YRvMoRnB9F7ygo8BX57J46";
+async function viaComentario(anchorEl, text){
+  if (!state.comments) return { ok:false, why:"comentários indisponíveis" };
   try {
     const can = await state.comments.canSendToClaude();
-    if (can !== "available") return fail(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora. Fica pendente para a próxima varredura." : "Envio ao Claude indisponível aqui. Fica pendente.");
-    const anchor = await state.comments.anchorFor($("#list"));
-    const r = await state.comments.sendToClaude({ anchor, text: pedidoTexto(id, w) });
-    await state.db.doc("vinhos/"+id).update({ pesquisa:{ status:"solicitada", pedidoEm:new Date().toISOString(), threadId:r.threadId } });
-    toast("Pedido de pesquisa enviado ao Claude.");
+    if (can !== "available") return { ok:false, why: can === "no_session" ? "nenhuma conversa do Claude acompanhando" : "envio por comentário indisponível" };
+    const anchor = await state.comments.anchorFor(anchorEl);
+    const r = await state.comments.sendToClaude({ anchor, text });
+    return { ok:true, threadId:r.threadId };
   } catch(e){
-    if (e.code === "consent_required" || e.code === "not_granted") return fail("Pedido não autorizado. Fica pendente para a próxima varredura.");
-    if (e.code === "rate_limited") return fail("Muitos pedidos seguidos. Fica pendente.");
-    return fail("Não consegui enviar o pedido agora. Fica pendente.");
+    if (e.code === "consent_required" || e.code === "not_granted") return { ok:false, why:"comentários não autorizados" };
+    if (e.code === "rate_limited") return { ok:false, why:"muitos pedidos seguidos", stop:true };
+    return { ok:false, why:"falha ao comentar" };
   }
+}
+async function viaTarefa(text){
+  if (!state.mcp) return { ok:false, why:"conector Claude Code Remote indisponível" };
+  try {
+    await state.mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: TRIGGER_ID, text });
+    return { ok:true };
+  } catch(e){
+    const m = { not_in_manifest:"conector não autorizado para esta página", blocked_by_policy:"conector bloqueado pela organização", server_not_connected:"conector Claude Code Remote não conectado", needs_reauth:"reconecte o Claude Code Remote em Configurações > Conectores", approval_required:"a tarefa precisa da sua aprovação", tool_error:"a tarefa agendada não aceitou o disparo", server_unavailable:"serviço indisponível no momento" };
+    return { ok:false, why: m[e.code] || ("falha ao disparar a tarefa (" + (e.code||"?") + ")") };
+  }
+}
+async function pedirPesquisa(id, w, manual){
+  const ref = state.db.doc("vinhos/"+id);
+  const fail = async (why) => { if (manual) toast(why); try { await ref.update({ pesquisa:{ status:"pendente", pedidoEm:new Date().toISOString(), motivo:why } }); } catch {} };
+  const text = pedidoTexto(id, w);
+  const c = await viaComentario($("#list"), text);
+  if (c.ok){ await ref.update({ pesquisa:{ status:"solicitada", via:"comentario", pedidoEm:new Date().toISOString(), threadId:c.threadId } }); toast("Pedido de pesquisa enviado ao Claude."); return; }
+  if (c.stop) return fail(c.why + ". Fica pendente; reenvie em um minuto.");
+  const t = await viaTarefa(text);
+  if (t.ok){ await ref.update({ pesquisa:{ status:"solicitada", via:"tarefa", pedidoEm:new Date().toISOString() } }); toast("Pesquisa disparada. O resultado chega na ficha em alguns minutos."); return; }
+  return fail(`Não consegui acionar o Claude (${c.why}; ${t.why}). Fica pendente: reenvie pela ficha.`);
 }
 function dbErr(e){
   const c = e && e.code;
@@ -890,8 +909,8 @@ $("#btnExport").onclick = exportCsv;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
 
 (async () => {
-  const [db, sample, downloads, assets, comments] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("assets"), claude.use("comments")]);
-  state.db = db; state.sample = sample; state.downloads = downloads; state.assets = assets; state.comments = comments;
+  const [db, sample, downloads, assets, comments, mcp] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("assets"), claude.use("comments"), claude.use("mcp")]);
+  state.db = db; state.sample = sample; state.downloads = downloads; state.assets = assets; state.comments = comments; state.mcp = mcp;
   if (sample){ try { const lim = await sample.limits(); state.canImages = !!lim.images; } catch { state.canImages = false; } }
   $("#footNote").textContent = sample ? (state.canImages ? "Leitura de rótulo e fichas pelo Claude ativas." : "Fichas pelo Claude ativas; leitura de rótulo indisponível aqui.") : "Claude indisponível nesta visualização: cadastro manual.";
   if (!db){ $("#status").textContent = "Banco indisponível nesta visualização."; state.loaded = true; renderAll(); return; }

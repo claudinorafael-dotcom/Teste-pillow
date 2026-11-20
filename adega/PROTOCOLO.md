@@ -13,7 +13,9 @@ Banco: coleções `vinhos`, `consumos` e `pesquisas` (ArtifactData). Fotos: asse
 ## Quando a sessão do Claude é acordada
 
 1. Por um comentário "Pesquisar avaliações…" ou "Avaliar compra…" vindo da página (`comments.sendToClaude`), ou
-2. Pela tarefa agendada "Adega: varredura de pesquisas pendentes" (a cada 4 h, sessão nova, prompt autossuficiente).
+2. Pela tarefa sob demanda "Adega: pesquisa sob demanda" (trig_01YRvMoRnB9F7ygo8BX57J46), disparada pelo próprio app
+   via conector Claude Code Remote (`fire_trigger`) quando o caminho 1 não está disponível. Sem agendamento por relógio:
+   só roda quando há algo novo.
 Em qualquer caso, consultar **todos** os documentos pendentes de `vinhos` e `pesquisas`, não só o citado no comentário.
 
 ## Pesquisa em paralelo (modo padrão)
