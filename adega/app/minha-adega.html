@@ -97,6 +97,21 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 .pre{white-space:pre-wrap;font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 14px}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.tab[aria-pressed="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tab small{font-weight:500;color:var(--muted)}
+.pcard{display:grid;grid-template-columns:64px 1fr;gap:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;min-width:0}
+.pcard:hover{border-color:var(--accent)}
+.pcard .ph{grid-row:1/span 4;width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--surface2)}
+.pcard .ph.empty-ph{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:22px}
+.pcard .name{font-family:var(--display);font-weight:600;font-size:17px;line-height:1.2;min-width:0;overflow-wrap:anywhere}
+.pcard .when{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pcard .ctx{font-size:13px;min-width:0;overflow-wrap:anywhere}
+.pcard .com{font-size:13px;color:var(--muted);min-width:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcard .mynota{font-family:var(--display);font-weight:700;font-size:18px;color:var(--accent);font-variant-numeric:tabular-nums;justify-self:end;grid-column:2;grid-row:1}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.photos img{max-width:100%;max-height:260px;border-radius:var(--r);background:var(--surface2)}
 .notas{display:flex;gap:6px;flex-wrap:wrap;min-width:0;align-items:center}
 .nt{font-size:12px;background:var(--surface2);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .nt b{color:var(--accent);font-weight:700;margin-right:2px}
@@ -112,7 +127,21 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
     <h1>Minha Adega <small id="hdrCount"></small></h1>
     <div class="status" id="status">Conectando ao banco…</div>
   </header>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-v="adega" aria-pressed="true" id="tabAdega">Adega</button>
+    <button class="tab" role="tab" data-v="provados" aria-pressed="false" id="tabProvados">Provados <small id="provCount"></small></button>
+  </div>
 
+  <div id="viewProvados" hidden>
+    <div class="toolbar">
+      <input type="search" id="pq" placeholder="Buscar vinho, pessoa, lugar…" aria-label="Buscar provados">
+    </div>
+    <div class="list" id="plist">
+      <div class="empty"><b>Seu diário de vinhos aparece aqui.</b><br>Toque em <b>+ Provado</b> para registrar o que bebeu, com quem, onde, e uma foto do momento.</div>
+    </div>
+  </div>
+
+  <div id="viewAdega">
   <div class="tiles" id="tiles">
     <button class="tile" id="tTotal" data-f="todas" aria-pressed="true"><div class="n">–</div><div class="l">Garrafas</div></button>
     <button class="tile ok" id="tAgora" data-f="agora"><div class="n">–</div><div class="l">Beber agora</div></button>
@@ -147,6 +176,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
   <div class="row" style="margin-top:18px;justify-content:space-between">
     <button class="btn small" id="btnExport">Exportar CSV (CellarTracker)</button>
     <span class="note" id="footNote"></span>
+  </div>
   </div>
 </div>
 
@@ -244,7 +274,7 @@ function renderList(){
     </div>`;
   }).join("");
 }
-function renderAll(){ renderTiles(); renderList(); }
+function renderAll(){ renderTiles(); renderList(); if (state.view === "provados") renderProvados(); }
 
 /* ---------- sheet ---------- */
 function openSheet(html){
@@ -518,21 +548,144 @@ function pesquisaLabel(w){
   if (p.status === "solicitada") return `Pedido enviado em ${(p.pedidoEm||"").slice(0,10)}, aguardando resposta.`;
   return `Pendente${p.motivo ? ": " + p.motivo : ""}`;
 }
-function openBebi(w){
-  openSheet(`<h2>Bebi uma garrafa</h2><div class="meta">${esc(nomeCompleto(w))} ${esc(w.safra||"")}</div>
-    <div class="grid2"><div class="field"><label for="b_data">Data</label><input id="b_data" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <div class="field"><label for="b_nota">Sua nota (50 a 100)</label><input id="b_nota" type="number" min="50" max="100" placeholder="92"></div></div>
-    <div class="field" style="margin-top:10px"><label for="b_com">Como estava?</label><textarea id="b_com" placeholder="Decantei 1 h. Fruta ainda viva, tanino macio. No ponto."></textarea></div>
-    <div class="row" style="margin-top:12px"><button class="btn primary" id="b_ok">Registrar</button><button class="btn" id="b_cancel">Cancelar</button></div>`);
-  $("#b_cancel").onclick = () => openDetail(w.id);
-  $("#b_ok").onclick = async () => {
-    $("#b_ok").disabled = true;
-    try {
-      await state.db.collection("consumos").add({ vinhoId:w.id, nome:nomeCompleto(w), safra:w.safra||"", data:$("#b_data").value, nota:$("#b_nota").value, comentario:$("#b_com").value.trim(), criadoEm:new Date().toISOString() });
-      await state.db.doc("vinhos/"+w.id).update({ qtd: Math.max(0,(w.qtd|0)-1) });
-      toast("Registrado. Saúde!"); closeSheet();
-    } catch(e){ toast(dbErr(e)); $("#b_ok").disabled = false; }
+function openBebi(w){ openProvadoForm(null, w); }
+
+/* ---------- Provados (tasting diary) ---------- */
+function provadoNome(c){ return c.nome || [c.produtor, c.vinho].filter(Boolean).join(" · "); }
+function fmtData(d){ if (!d) return ""; const [y,m,dd] = String(d).slice(0,10).split("-"); return (dd && m && y) ? `${dd}/${m}/${y}` : d; }
+function renderProvados(){
+  const list = $("#plist"); if (!list) return;
+  const q = (state.pq||"").toLowerCase();
+  let arr = state.consumos.slice().sort((a,b) => (b.data||"").localeCompare(a.data||"") || (b.criadoEm||"").localeCompare(a.criadoEm||""));
+  if (q) arr = arr.filter(c => [provadoNome(c), c.safra, c.pessoas, c.lugar, c.comentario].join(" ").toLowerCase().includes(q));
+  $("#provCount").textContent = state.consumos.length ? `(${state.consumos.length})` : "";
+  if (!state.loaded) return;
+  if (!arr.length){
+    list.innerHTML = state.consumos.length ? `<div class="empty">Nada encontrado com essa busca.</div>` : `<div class="empty"><b>Seu diário de vinhos aparece aqui.</b><br>Toque em <b>+ Provado</b> para registrar o que bebeu, com quem, onde, e uma foto do momento.</div>`;
+    return;
+  }
+  list.innerHTML = arr.map(c => {
+    const ph = c.fotoLugarId || c.fotoRotuloId;
+    const ctx = [c.lugar, c.pessoas ? "com " + c.pessoas : ""].filter(Boolean).join(" · ");
+    return `<div class="pcard" data-id="${esc(c.id)}" role="button" tabindex="0">
+      ${ph ? `<img class="ph" src="${esc(blobUrl(ph))}" alt="">` : `<div class="ph empty-ph">🍷</div>`}
+      <div class="name">${esc(provadoNome(c))} <span style="color:var(--muted);font-weight:500">${esc(c.safra||"")}</span></div>
+      ${c.nota ? `<div class="mynota">${esc(c.nota)}</div>` : ""}
+      <div class="when">${esc(fmtData(c.data))}</div>
+      <div class="ctx">${esc(ctx)}</div>
+      <div class="com">${esc(c.comentario||"")}</div>
+    </div>`;
+  }).join("");
+}
+function openProvadoDetail(id){
+  const c = state.consumos.find(x => x.id === id); if (!c){ closeSheet(); return; }
+  const w = c.vinhoId ? state.wines.find(x => x.id === c.vinhoId) : null;
+  openSheet(`
+    <div class="row" style="justify-content:space-between">
+      <span class="pill tipo">${esc(c.tipo || (w && w.tipo) || "Provado")}</span>
+      <span class="row"><button class="btn small" id="pd_edit">Editar</button><button class="btn small" id="pd_close">Fechar</button></span>
+    </div>
+    <h2>${esc(provadoNome(c))} <span style="color:var(--muted);font-weight:500">${esc(c.safra||"")}</span></h2>
+    <div class="meta">${esc(fmtData(c.data))}${c.nota ? " · sua nota " + esc(c.nota) : ""}</div>
+    <div class="photos">${c.fotoLugarId ? `<img src="${esc(blobUrl(c.fotoLugarId))}" alt="Foto do momento">` : ""}${c.fotoRotuloId ? `<img src="${esc(blobUrl(c.fotoRotuloId))}" alt="Rótulo">` : ""}</div>
+    <div class="sec"><h3>O momento</h3><div class="kv">
+      <div>Com quem</div><div>${esc(c.pessoas||"—")}</div>
+      <div>Onde</div><div>${esc(c.lugar||"—")}</div>
+      <div>Quando</div><div>${esc(fmtData(c.data)||"—")}</div>
+    </div></div>
+    <div class="sec"><h3>Como estava</h3><div class="pre">${esc(c.comentario||"—")}</div></div>
+    ${w ? `<div class="row"><button class="btn small" id="pd_wine">Ver ficha na adega</button></div>` : ""}
+    <div class="row" style="margin-top:12px"><button class="btn danger small" id="pd_del">Excluir registro</button></div>`);
+  $("#sheet").dataset.pid = id;
+  $("#pd_close").onclick = closeSheet;
+  $("#pd_edit").onclick = () => openProvadoForm(c, null);
+  const pw = $("#pd_wine"); if (pw) pw.onclick = () => openDetail(w.id);
+  $("#pd_del").onclick = async () => { try { await state.db.doc("consumos/"+c.id).delete(); toast("Registro excluído."); closeSheet(); } catch(e){ toast(dbErr(e)); } };
+}
+/* c = existing record to edit (or null); w = cellar wine being opened (or null) */
+function openProvadoForm(c, w){
+  const isEdit = !!(c && c.id);
+  const src = c || (w ? { vinhoId:w.id, produtor:w.produtor, vinho:w.vinho, safra:w.safra, tipo:w.tipo, fotoRotuloId:w.fotoId } : {});
+  state.pendingFoto = null; state.pendingFotoLugar = null;
+  const adegaOpts = state.wines.filter(x => (x.qtd|0) > 0).map(x => `<option value="${esc(x.id)}" ${src.vinhoId===x.id?"selected":""}>${esc(nomeCompleto(x))} ${esc(x.safra||"")}</option>`).join("");
+  openSheet(`
+    <h2>${isEdit ? "Editar provado" : (w ? "Bebi uma garrafa" : "Novo provado")}</h2>
+    <div class="meta">${w ? esc(nomeCompleto(w)) + " " + esc(w.safra||"") : "Um vinho da adega ou qualquer outro que você provou."}</div>
+    ${w ? "" : `<div class="field" style="margin-bottom:10px"><label for="c_adega">Da adega?</label><select id="c_adega"><option value="">Não, outro vinho</option>${adegaOpts}</select></div>`}
+    <div class="row" style="margin-bottom:10px">
+      <input type="file" id="c_foto_rotulo" accept="image/*" capture="environment" hidden>
+      <button class="btn ${w||isEdit?"":"primary"}" id="c_btn_rotulo" type="button">📷 ${src.fotoRotuloId ? "Trocar foto do rótulo" : "Identificar pelo rótulo"}</button>
+      <span class="note" id="fotoStatus"></span>
+    </div>
+    <form id="cform">
+      <div class="grid2">
+        <div class="field"><label for="f_produtor">Produtor</label><input id="f_produtor" value="${esc(src.produtor)}"></div>
+        <div class="field"><label for="f_vinho">Vinho</label><input id="f_vinho" value="${esc(src.vinho)}"></div>
+      </div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field"><label for="f_safra">Safra</label><input id="f_safra" inputmode="numeric" value="${esc(src.safra)}"></div>
+        <div class="field"><label for="f_tipo">Tipo</label><select id="f_tipo">${TIPOS.map(t => `<option ${t===(src.tipo||"Tinto")?"selected":""}>${t}</option>`).join("")}</select></div>
+        <div class="field"><label for="c_nota">Sua nota (50 a 100)</label><input id="c_nota" type="number" min="50" max="100" value="${esc(src.nota)}" placeholder="92"></div>
+      </div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field"><label for="c_data">Quando</label><input id="c_data" type="date" value="${esc(src.data || new Date().toISOString().slice(0,10))}"></div>
+        <div class="field"><label for="c_lugar">Onde</label><input id="c_lugar" value="${esc(src.lugar)}" placeholder="Casa, restaurante…"></div>
+        <div class="field"><label for="c_pessoas">Com quem</label><input id="c_pessoas" value="${esc(src.pessoas)}" placeholder="Ana, Pedro"></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label for="c_com">Como estava / anotações</label><textarea id="c_com" placeholder="Decantei 1 h. Fruta viva, tanino macio. Combinou com o cordeiro.">${esc(src.comentario)}</textarea></div>
+      <div class="row" style="margin-top:10px">
+        <input type="file" id="c_foto_lugar" accept="image/*" capture="environment" hidden>
+        <button class="btn" id="c_btn_lugar" type="button">📸 ${src.fotoLugarId ? "Trocar foto do momento" : "Foto do momento"}</button>
+        <span class="note" id="fotoLugarStatus"></span>
+      </div>
+      ${(!isEdit && (w || adegaOpts)) ? `<label style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:14px;color:var(--fg)"><input type="checkbox" id="c_baixa" style="width:auto" ${w?"checked":""}> Dar baixa de 1 garrafa na adega</label>` : ""}
+      <div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="c_ok">${isEdit ? "Salvar" : "Registrar"}</button><button class="btn" type="button" id="c_cancel">Cancelar</button></div>
+    </form>`);
+  $("#c_cancel").onclick = () => isEdit ? openProvadoDetail(c.id) : (w ? openDetail(w.id) : closeSheet());
+  const fr = $("#c_foto_rotulo"), br = $("#c_btn_rotulo");
+  if (!state.sample || !state.canImages) br.hidden = true;
+  br.onclick = () => fr.click();
+  fr.onchange = () => identificar(fr.files[0]);
+  const fl = $("#c_foto_lugar"), bl = $("#c_btn_lugar");
+  if (!state.assets) bl.hidden = true;
+  bl.onclick = () => fl.click();
+  fl.onchange = async () => {
+    const file = fl.files[0]; if (!file) return;
+    const st = $("#fotoLugarStatus"); st.innerHTML = `<span class="spin"></span>Enviando…`;
+    try { const r = await state.assets.upload(file); state.pendingFotoLugar = r.id; st.textContent = "Foto pronta."; }
+    catch(e){ st.textContent = "Não consegui enviar a foto."; }
   };
+  const sel = $("#c_adega");
+  if (sel) sel.onchange = () => { const x = state.wines.find(y => y.id === sel.value); if (x) fillForm({ produtor:x.produtor, vinho:x.vinho, safra:x.safra, tipo:x.tipo }); };
+  $("#cform").onsubmit = async (e) => {
+    e.preventDefault();
+    const v = id => ($("#"+id)?.value ?? "").trim();
+    const vinhoId = w ? w.id : (sel && sel.value) || src.vinhoId || "";
+    const d = { vinhoId, produtor:v("f_produtor"), vinho:v("f_vinho"), safra:v("f_safra"), tipo:v("f_tipo"), nota:v("c_nota"), data:v("c_data"), lugar:v("c_lugar"), pessoas:v("c_pessoas"), comentario:v("c_com") };
+    d.nome = [d.produtor, d.vinho].filter(Boolean).join(" · ");
+    if (!d.nome){ toast("Informe o produtor ou o vinho."); return; }
+    if (state.pendingFoto) d.fotoRotuloId = state.pendingFoto; else if (src.fotoRotuloId) d.fotoRotuloId = src.fotoRotuloId;
+    if (state.pendingFotoLugar) d.fotoLugarId = state.pendingFotoLugar; else if (src.fotoLugarId) d.fotoLugarId = src.fotoLugarId;
+    $("#c_ok").disabled = true;
+    try {
+      if (isEdit){ await state.db.doc("consumos/"+c.id).update(d); toast("Salvo."); openProvadoDetail(c.id); }
+      else {
+        d.criadoEm = new Date().toISOString();
+        await state.db.collection("consumos").add(d);
+        const baixa = $("#c_baixa"); const x = vinhoId ? state.wines.find(y => y.id === vinhoId) : null;
+        if (baixa && baixa.checked && x) await state.db.doc("vinhos/"+x.id).update({ qtd: Math.max(0,(x.qtd|0)-1) });
+        toast("Registrado. Saúde!"); closeSheet(); setView("provados");
+      }
+    } catch(e){ toast(dbErr(e)); $("#c_ok").disabled = false; }
+  };
+}
+function setView(v){
+  state.view = v;
+  $("#viewAdega").hidden = v !== "adega"; $("#viewProvados").hidden = v !== "provados";
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-pressed", t.dataset.v === v ? "true" : "false"));
+  $("#fab").textContent = v === "provados" ? "+ Provado" : "+ Garrafa";
+  if (location.hash !== "#"+v) history.replaceState(null, "", "#"+v);
+  if (v === "provados") renderProvados();
 }
 
 /* ---------- export ---------- */
@@ -556,7 +709,13 @@ $("#q").oninput = (e) => { state.q = e.target.value.trim(); renderList(); };
 $("#sort").onchange = (e) => { state.sort = e.target.value; renderList(); };
 $("#list").onclick = (e) => { const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); };
 $("#list").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); } };
-$("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } openForm(null); };
+$("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } state.view === "provados" ? openProvadoForm(null, null) : openForm(null); };
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => setView(t.dataset.v));
+window.addEventListener("hashchange", () => setView(location.hash === "#provados" ? "provados" : "adega"));
+$("#pq").oninput = (e) => { state.pq = e.target.value.trim(); renderProvados(); };
+$("#plist").onclick = (e) => { const c = e.target.closest(".pcard"); if (c) openProvadoDetail(c.dataset.id); };
+$("#plist").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".pcard"); if (c) openProvadoDetail(c.dataset.id); } };
+setView(location.hash === "#provados" ? "provados" : "adega");
 $("#btnExport").onclick = exportCsv;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
 
@@ -574,7 +733,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
     renderAll();
     const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#b_ok")) openDetail(sh.dataset.id);
   }, err => { clearTimeout(timer); $("#status").textContent = "Não foi possível carregar a adega."; state.loaded = true; renderAll(); });
-  db.collection("consumos").onSnapshot(snap => { state.consumos = snap.docs.map(d => ({ id:d.id, ...d.data() })); }, () => {});
+  db.collection("consumos").onSnapshot(snap => {
+    state.consumos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderProvados();
+    const sh = $("#sheet"); if (sh && sh.dataset.pid && !$("#cform")) openProvadoDetail(sh.dataset.pid);
+  }, () => {});
 })();
 })();
 </script>
