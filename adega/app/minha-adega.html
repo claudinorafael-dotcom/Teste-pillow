@@ -474,6 +474,7 @@ async function avaliarCompra(){
     const doc = { ...q, fotoId: state.pendingFoto || "", rapida: r, verificada: null, status:"rapida", criadoEm:new Date().toISOString() };
     const ref = await state.db.collection("pesquisas").add(doc);
     $("#q_status").textContent = "";
+    state.lastResultId = ref.id;
     renderResultado({ ...doc, id: ref.id }, $("#q_result"));
   } catch(e){
     $("#q_status").textContent = e.code === "not_granted" ? "Uso do Claude não autorizado." : e.code === "rate_limited" ? "Muitas consultas seguidas. Aguarde." : e.code === "invalid_json" ? "Resposta fora do formato. Tente de novo." : "Não consegui avaliar agora.";
@@ -484,6 +485,7 @@ function renderResultado(p, host){
   const r = p.rapida || {}, vf = p.verificada;
   host.innerHTML = `<div class="sec">
     <div class="row" style="justify-content:space-between">${veredPill((vf||r).veredito)}<span class="note">${vf ? "Verificado na internet pelo Claude" : "Veredito imediato, sem pesquisa na internet"}</span></div>
+    ${vf && r.veredito && r.veredito !== vf.veredito ? `<div class="note" style="margin-top:6px">Veredito imediato anterior: ${veredPill(r.veredito)} <span>(sem identificar o produtor; substituído pela verificação)</span></div>` : ""}
     <h2 style="margin:8px 0 2px">${esc([p.produtor,p.vinho].filter(Boolean).join(" · "))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></h2>
     <div class="meta">Pedido: R$ ${esc(p.precoPedido)}${p.loja ? " em " + esc(p.loja) : ""} · Preço justo: ${esc((vf||r).precoJusto || (vf && vf.precoMercado) || "?")}</div>
     <div style="font-weight:600;margin:6px 0">${esc((vf||r).titulo||"")}</div>
@@ -891,6 +893,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
   db.collection("pesquisas").onSnapshot(snap => {
     state.pesquisas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     renderPesquisas();
+    if (state.lastResultId){ const p = state.pesquisas.find(x => x.id === state.lastResultId); if (p) renderResultado(p, $("#q_result")); else { state.lastResultId = null; $("#q_result").innerHTML = ""; } }
     const sh = $("#sheet"); if (sh && sh.dataset.qid) openPesquisaDetail(sh.dataset.qid);
   }, () => {});
   db.collection("consumos").onSnapshot(snap => {
