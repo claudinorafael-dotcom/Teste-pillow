@@ -284,7 +284,8 @@ async function shrinkImage(file, max = 1600){
 */
 function janela(w){
   const f = w.ficha || {};
-  const a = Number(f.janelaInicio) || null, b = Number(f.janelaFim) || null;
+  let a = Number(f.janelaInicio) || null, b = Number(f.janelaFim) || null;
+  if (a && b && a > b) [a, b] = [b, a];
   if (!a && !b) return {k:"none", label:"Sem janela", a, b};
   if (a && YEAR < a) return {k:"hold", label:"Guardar", a, b};
   if (b && YEAR > b) return {k:"bad", label:"Passou do ponto", a, b};
@@ -294,11 +295,13 @@ function janela(w){
   let p1 = Number(f.apiceInicio) || null, p2 = Number(f.apiceFim) || null;
   if (!(p1 && p2 && p2 >= p1) && ap){ p1 = ap - 1; p2 = ap + 1; }
   if (p1 && a) p1 = Math.max(p1, a); if (p2 && b) p2 = Math.min(p2, b);
-  if (p1 && span >= 6 && YEAR < p1 - 1) return {k:"young", label:`Já dá, ápice a partir de ${p1}`, a, b, ap, p1, p2};
+  if (p1 && p2 && p1 > p2){ p1 = null; p2 = null; }
+  if (p1 && p2 && span >= 6 && YEAR < p1 - 1) return {k:"young", label:`Já dá, ápice a partir de ${p1}`, a, b, ap, p1, p2};
   if (p1 && p2 && YEAR >= p1 && YEAR <= p2) return {k:"ok", label:"No ápice", a, b, ap, p1, p2};
   if (p2 && YEAR > p2) return {k:"ok", label:"Pronto, após o ápice", a, b, ap, p1, p2};
   return {k:"ok", label:"Pronto para beber", a, b, ap, p1, p2};
 }
+function hojeLocal(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
 /* [key, short label for cards, long label for the detail sheet] */
 const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / Wine Advocate"],["spectator","WS","Wine Spectator"],["decanter","DEC","Decanter"],["vinous","VIN","Vinous / Galloni"],["atkin","TA","Tim Atkin"],["descorchados","DESC","Descorchados"],["vivino","Vivino","Vivino"],["cellartracker","CT","CellarTracker"]];
@@ -388,13 +391,14 @@ function openSheet(html){
   $("#sheetBg").onclick = closeSheet;
   document.body.style.overflow = "hidden";
 }
-function closeSheet(){ $("#sheetHost").innerHTML = ""; document.body.style.overflow = ""; }
+function closeSheet(){ $("#sheetHost").innerHTML = ""; document.body.style.overflow = ""; state.pendingFoto = null; state.pendingFotoLugar = null; state.fotoToken = null; }
 let toastT;
 function toast(msg){ const h=$("#toastHost"); h.innerHTML = `<div class="toast">${esc(msg)}</div>`; clearTimeout(toastT); toastT = setTimeout(()=>h.innerHTML="", 3200); }
 
 /* ---------- form (new / edit) ---------- */
 function formHtml(w = {}){
-  const opt = (v) => TIPOS.map(t => `<option ${t===(w.tipo||"Tinto")?"selected":""}>${t}</option>`).join("");
+  const tipos = w.tipo && !TIPOS.includes(w.tipo) ? [...TIPOS, w.tipo] : TIPOS;
+  const opt = (v) => tipos.map(t => `<option ${t===(w.tipo||"Tinto")?"selected":""}>${esc(t)}</option>`).join("");
   return `
   <h2>${w.id ? "Editar garrafa" : "Nova garrafa"}</h2>
   <div class="meta">${w.id ? "" : "Fotografe o rótulo e deixe o preenchimento comigo, ou digite."}</div>
@@ -477,8 +481,8 @@ function tirarFoto(fileInput, onFile){
     c.toBlob(b => { stop(); if (b) onFile(new File([b], "foto.jpg", { type:"image/jpeg" })); else toast("Não consegui capturar. Tente pela galeria."); }, "image/jpeg", 0.9);
   };
   md.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1440 } }, audio:false })
-    .then(st => { stream = st; video.srcObject = st; })
-    .catch(e => { stop(); state.camBlocked = true; toast(`Câmera no app indisponível (${(e && e.name) || "?"}). Abrindo a câmera do aparelho.`); cameraDoAparelho(fileInput); });
+    .then(st => { if (!document.getElementById("cam")){ st.getTracks().forEach(t => t.stop()); return; } stream = st; video.srcObject = st; })
+    .catch(e => { stop(); state.camBlocked = true; toast(`Câmera no app indisponível (${(e && e.name) || "?"}). Se a câmera do aparelho não abrir, toque de novo.`); cameraDoAparelho(fileInput); });
 }
 /* Draft: Android often kills the page while the camera app is open; the form would vanish on reload.
    Every keystroke and every camera tap saves the form to localStorage; on load, it is restored. */
@@ -487,7 +491,7 @@ function saveDraft(prefix = "f_"){
   try {
     const form = prefix === "q_" ? $("#qform") : $("#wform"); if (!form) return;
     const vals = {}; form.querySelectorAll("input,select").forEach(el => { if (el.id && el.type !== "file") vals[el.id] = el.value; });
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ kind: prefix === "q_" ? "pesquisa" : "garrafa", vals, pendingFoto: state.pendingFoto || null, t: Date.now() }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ kind: prefix === "q_" ? "pesquisa" : "garrafa", vals, pendingFoto: (prefix === "q_" ? state.pendingFotoQ : state.pendingFoto) || null, t: Date.now() }));
   } catch {}
 }
 function clearDraft(){ try { localStorage.removeItem(DRAFT_KEY); } catch {} }
@@ -496,10 +500,10 @@ function restoreDraft(){
   if (!d || !d.vals || Date.now() - (d.t||0) > 2*3600e3){ clearDraft(); return; }
   clearDraft();
   const filled = Object.entries(d.vals).some(([id,v]) => v && !/_(qtd|tamanho|tipo)$/.test(id));
-  if (!filled && !d.pendingFoto){ toast("O app reiniciou durante a foto. Tente de novo; se repetir, tire a foto pela câmera e escolha da galeria."); return; }
+  if (!filled && !d.pendingFoto){ if (d.kind === "garrafa" && Date.now() - d.t < 10*60e3) toast("O app reiniciou durante a foto. Tente de novo; se repetir, tire a foto pela câmera e escolha da galeria."); return; }
   const apply = (st) => {
     Object.entries(d.vals).forEach(([id,v]) => { const el = $("#"+id); if (el && v) el.value = v; });
-    state.pendingFoto = d.pendingFoto || null;
+    if (d.kind === "pesquisa") state.pendingFotoQ = d.pendingFoto || null; else state.pendingFoto = d.pendingFoto || null;
     if (st) st.textContent = d.pendingFoto ? "Cadastro recuperado; a foto já estava enviada." : "Cadastro recuperado. Se faltar a foto, tire de novo.";
   };
   if (d.kind === "pesquisa"){ setView("pesquisa"); apply($("#q_fotoStatus")); }
@@ -539,8 +543,9 @@ function openForm(w, keepFoto){
 }
 async function guardarFoto(file){
   if (!file || !state.assets) return;
-  const st = $("#fotoStatus"); st.innerHTML = `<span class="spin"></span>Enviando foto…`;
-  try { const r = await state.assets.upload(await shrinkImage(file)); state.pendingFoto = r.id; st.textContent = "Foto pronta. Salve para gravar."; }
+  const st = $("#fotoStatus"); if (!st) return;
+  st.innerHTML = `<span class="spin"></span>Enviando foto…`;
+  try { const r = await state.assets.upload(await shrinkImage(file)); if ($("#fotoStatus") === st) { state.pendingFoto = r.id; st.textContent = "Foto pronta. Salve para gravar."; } }
   catch(e){ st.textContent = e.code === "quota_exceeded" ? "Sem espaço para fotos." : "Não consegui enviar a foto."; }
 }
 /* ---------- research request to Claude (wakes the building session) ---------- */
@@ -563,9 +568,9 @@ async function avaliarCompra(){
   $("#q_ok").disabled = true; $("#q_status").innerHTML = `<span class="spin"></span>Enviando…`;
   $("#q_result").innerHTML = "";
   try {
-    const doc = { ...q, fotoId: state.pendingFoto || "", rapida: null, verificada: null, status:"pendente", criadoEm:new Date().toISOString() };
+    const doc = { ...q, fotoId: state.pendingFotoQ || "", rapida: null, verificada: null, status:"pendente", criadoEm:new Date().toISOString() };
     const ref = await state.db.collection("pesquisas").add(doc);
-    clearDraft();
+    clearDraft(); state.pendingFotoQ = null;
     const p = { ...doc, id: ref.id };
     state.lastResultId = ref.id;
     $("#q_status").textContent = "";
@@ -707,11 +712,14 @@ function parseJsonLoose(text){
 async function identificar(file, opts = {}){
   if (!file) return;
   const prefix = opts.prefix || "f_";
-  const st = $(opts.status || "#fotoStatus"); st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
+  const st = $(opts.status || "#fotoStatus"); if (!st) return;
+  st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
+  const token = state.fotoToken = {};
+  const slot = prefix === "q_" ? "pendingFotoQ" : "pendingFoto";
   const prompt = `Esta é a foto do rótulo de uma garrafa de vinho. Identifique o vinho e responda APENAS com um objeto JSON (sem texto antes ou depois, sem crases de código) com estas chaves (string vazia quando não souber): {"produtor":"","vinho":"","safra":"","tipo":"","denominacao":"","regiao":"","pais":"","uvas":"","tamanho":"750ml"}. "tipo" deve ser um de: Tinto, Branco, Rosé, Espumante, Doce, Fortificado. "safra" é o ano com 4 dígitos ou "NV". "vinho" é o nome da cuvée sem o produtor. Use o conhecimento que tiver sobre o produtor para preencher denominação, região, país e uvas mesmo que não estejam no rótulo. Exemplo: {"produtor":"Jacopo Biondi Santi","vinho":"Sassoalloro","safra":"2021","tipo":"Tinto","denominacao":"Toscana IGT","regiao":"Toscana, Maremma","pais":"Itália","uvas":"Sangiovese","tamanho":"750ml"}`;
   try {
     const small = await shrinkImage(file);
-    const up = state.assets ? state.assets.upload(small).then(r => { state.pendingFoto = r.id; }).catch(() => {}) : Promise.resolve();
+    const up = state.assets ? state.assets.upload(small).then(r => { if (state.fotoToken === token || prefix === "q_") state[slot] = r.id; }).catch(() => {}) : Promise.resolve();
     const r = await state.sample(prompt, { images:[small], modelTier:"default", cache:false });
     await up;
     const d = parseJsonLoose(r && r.text);
@@ -754,6 +762,7 @@ async function gerarFicha(w, auto){
 /* ---------- detail ---------- */
 function openDetail(id){
   const w = state.wines.find(x => x.id === id); if (!w) { closeSheet(); return; }
+  const prev = $("#sheet"); const keepScroll = prev && prev.dataset.id === id ? prev.scrollTop : 0;
   const f = w.ficha || null; const j = janela(w);
   const hist = state.consumos.filter(c => c.vinhoId === id).sort((a,b)=> (b.data||"").localeCompare(a.data||""));
   const nota = (v) => v === null || v === undefined || v === "" ? null : v;
@@ -810,7 +819,7 @@ function openDetail(id){
     <span class="note" id="fichaStatus"></span>
   </div>`;
   openSheet(html);
-  $("#sheet").dataset.id = id;
+  $("#sheet").dataset.id = id; if (keepScroll) $("#sheet").scrollTop = keepScroll;
   $("#btnClose").onclick = closeSheet;
   $("#btnEdit").onclick = () => openForm(w);
   const bf = $("#btnFicha"); if (bf) bf.onclick = async () => { $("#btnFicha").disabled = true; $("#fichaStatus").innerHTML = `<span class="spin"></span>Consultando…`; await gerarFicha(w, false); if ($("#btnFicha")) $("#btnFicha").disabled = false; if ($("#fichaStatus")) $("#fichaStatus").textContent = ""; };
@@ -833,9 +842,9 @@ function openPreco(w){
 }
 function pesquisaLabel(w){
   const p = w.pesquisa; if (!p) return "Nenhum pedido feito.";
-  if (p.status === "feita") return `Feita em ${(p.feitaEm||"").slice(0,10)}.`;
-  if (p.status === "solicitada") return `Pedido enviado em ${(p.pedidoEm||"").slice(0,10)}. A ficha completa (notas, janela, preço) chega em alguns minutos.`;
-  return `Pendente${p.motivo ? ": " + p.motivo : ""}`;
+  if (p.status === "feita") return `Feita em ${esc((p.feitaEm||"").slice(0,10))}.`;
+  if (p.status === "solicitada") return `Pedido enviado em ${esc((p.pedidoEm||"").slice(0,10))}. A ficha completa (notas, janela, preço) chega em alguns minutos.`;
+  return `Pendente${p.motivo ? ": " + esc(p.motivo) : ""}`;
 }
 function openBebi(w){ openProvadoForm(null, w); }
 
@@ -896,7 +905,7 @@ function openProvadoForm(c, w){
   const isEdit = !!(c && c.id);
   const src = c || (w ? { vinhoId:w.id, produtor:w.produtor, vinho:w.vinho, safra:w.safra, tipo:w.tipo, fotoRotuloId:w.fotoId } : {});
   state.pendingFoto = null; state.pendingFotoLugar = null;
-  const adegaOpts = state.wines.filter(x => (x.qtd|0) > 0).map(x => `<option value="${esc(x.id)}" ${src.vinhoId===x.id?"selected":""}>${esc(nomeCompleto(x))} ${esc(x.safra||"")}</option>`).join("");
+  const adegaOpts = state.wines.filter(x => (x.qtd|0) > 0 || x.id === src.vinhoId).map(x => `<option value="${esc(x.id)}" ${src.vinhoId===x.id?"selected":""}>${esc(nomeCompleto(x))} ${esc(x.safra||"")}</option>`).join("");
   openSheet(`
     <h2>${isEdit ? "Editar provado" : (w ? "Bebi uma garrafa" : "Novo provado")}</h2>
     <div class="meta">${w ? esc(nomeCompleto(w)) + " " + esc(w.safra||"") : "Um vinho da adega ou qualquer outro que você provou."}</div>
@@ -918,7 +927,7 @@ function openProvadoForm(c, w){
         <div class="field"><label for="c_nota">Sua nota (50 a 100)</label><input id="c_nota" type="number" min="50" max="100" value="${esc(src.nota)}" placeholder="92"></div>
       </div>
       <div class="grid3" style="margin-top:10px">
-        <div class="field"><label for="c_data">Quando</label><input id="c_data" type="date" value="${esc(src.data || new Date().toISOString().slice(0,10))}"></div>
+        <div class="field"><label for="c_data">Quando</label><input id="c_data" type="date" value="${esc(src.data || hojeLocal())}"></div>
         <div class="field"><label for="c_lugar">Onde</label><input id="c_lugar" value="${esc(src.lugar)}" placeholder="Casa, restaurante…"></div>
         <div class="field"><label for="c_pessoas">Com quem</label><input id="c_pessoas" value="${esc(src.pessoas)}" placeholder="Ana, Pedro"></div>
       </div>
@@ -942,8 +951,9 @@ function openProvadoForm(c, w){
   if (!state.assets) bl.hidden = true;
   const subirLugar = async (file) => {
     if (!file) return;
-    const st = $("#fotoLugarStatus"); st.innerHTML = `<span class="spin"></span>Enviando…`;
-    try { const r = await state.assets.upload(await shrinkImage(file)); state.pendingFotoLugar = r.id; st.textContent = "Foto pronta."; }
+    const st = $("#fotoLugarStatus"); if (!st) return;
+    st.innerHTML = `<span class="spin"></span>Enviando…`;
+    try { const r = await state.assets.upload(await shrinkImage(file)); if ($("#fotoLugarStatus") === st) { state.pendingFotoLugar = r.id; st.textContent = "Foto pronta."; } }
     catch(e){ st.textContent = "Não consegui enviar a foto."; }
   };
   bl.onclick = () => tirarFoto(fl, subirLugar);
@@ -954,7 +964,7 @@ function openProvadoForm(c, w){
   $("#cform").onsubmit = async (e) => {
     e.preventDefault();
     const v = id => ($("#"+id)?.value ?? "").trim();
-    const vinhoId = w ? w.id : (sel && sel.value) || src.vinhoId || "";
+    const vinhoId = w ? w.id : sel ? sel.value : (src.vinhoId || "");
     const d = { vinhoId, produtor:v("f_produtor"), vinho:v("f_vinho"), safra:v("f_safra"), tipo:v("f_tipo"), nota:v("c_nota"), data:v("c_data"), lugar:v("c_lugar"), pessoas:v("c_pessoas"), comentario:v("c_com") };
     d.nome = [d.produtor, d.vinho].filter(Boolean).join(" · ");
     if (!d.nome){ toast("Informe o produtor ou o vinho."); return; }
@@ -1011,7 +1021,7 @@ $("#q_btn_foto").onclick = () => { saveDraft("q_"); tirarFoto($("#q_foto"), f =>
 $("#qform").oninput = () => saveDraft("q_");
 $("#q_btn_gal").onclick = () => { saveDraft("q_"); galeria($("#q_foto")); };
 $("#q_foto").onchange = async () => { const el = $("#q_foto"); const f = el.files[0]; el.value = ""; await identificar(f, { prefix:"q_", status:"#q_fotoStatus" }); };
-$("#q_clear").onclick = () => { clearDraft(); $("#qform").reset(); state.pendingFoto = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
+$("#q_clear").onclick = () => { clearDraft(); $("#qform").reset(); state.pendingFotoQ = null; state.fotoToken = null; $("#q_result").innerHTML = ""; $("#q_fotoStatus").textContent = ""; };
 $("#qform").onsubmit = (e) => { e.preventDefault(); avaliarCompra(); };
 $("#qlist").onclick = (e) => { const c = e.target.closest(".card"); if (c) openPesquisaDetail(c.dataset.id); };
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => setView(t.dataset.v));
@@ -1022,10 +1032,11 @@ $("#plist").onclick = (e) => { const c = e.target.closest(".pcard"); if (c) open
 $("#plist").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".pcard"); if (c) openProvadoDetail(c.dataset.id); } };
 setView(viewFromHash());
 $("#btnExport").onclick = exportCsv;
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; const cc = $("#camCancel"); if (cc) cc.click(); else closeSheet(); });
 
 (async () => {
-  const [db, sample, downloads, assets, comments, mcp] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("assets"), claude.use("comments"), claude.use("mcp")]);
+  const use = (n) => claude.use(n).catch(() => null);
+  const [db, sample, downloads, assets, comments, mcp] = await Promise.all([use("db"), use("sample"), use("downloads"), use("assets"), use("comments"), use("mcp")]);
   state.db = db; state.sample = sample; state.downloads = downloads; state.assets = assets; state.comments = comments; state.mcp = mcp;
   if (sample){ try { const lim = await sample.limits(); state.canImages = !!lim.images; } catch { state.canImages = false; } }
   $("#footNote").textContent = sample ? (state.canImages ? "Leitura de rótulo e fichas pelo Claude ativas." : "Fichas pelo Claude ativas; leitura de rótulo indisponível aqui.") : "Claude indisponível nesta visualização: cadastro manual.";
@@ -1035,9 +1046,9 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
   db.collection("vinhos").onSnapshot(snap => {
     state.wines = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     state.loaded = true;
-    if (!snap.metadata.fromCache){ clearTimeout(timer); $("#status").textContent = "Sincronizado"; }
+    if (!(snap.metadata && snap.metadata.fromCache)){ clearTimeout(timer); $("#status").textContent = "Sincronizado"; }
     renderAll();
-    const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#b_ok")) openDetail(sh.dataset.id);
+    const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#cform")) openDetail(sh.dataset.id);
   }, err => { clearTimeout(timer); $("#status").textContent = "Não foi possível carregar a adega."; state.loaded = true; renderAll(); });
   db.collection("pesquisas").onSnapshot(snap => {
     state.pesquisas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
