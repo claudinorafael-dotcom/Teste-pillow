@@ -1,0 +1,540 @@
+<title>Minha Adega</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one column, summary strip on top, list of bottles, sheet for detail/form. Garnet accent on graphite-cool neutrals. */
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --surface2:#eeece7; --fg:#1d1b19; --muted:#6b6660; --line:#dcd8d1;
+  --accent:#7a1f3d; --accent-fg:#ffffff; --accent-soft:#f3e3e9;
+  --ok:#2f7a4a; --ok-soft:#e1f0e6; --warn:#a86a0f; --warn-soft:#f7ebd3; --bad:#9e2b2b; --bad-soft:#f6dede; --hold:#3b5b8a; --hold-soft:#e0e8f3;
+  --display:"Fraunces",Georgia,"Times New Roman",serif; --body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141312; --surface:#1e1c1a; --surface2:#262320; --fg:#ece8e1; --muted:#a39d94; --line:#36322e;
+  --accent:#c9496f; --accent-fg:#1a0a10; --accent-soft:#3a1f29;
+  --ok:#6cc48a; --ok-soft:#1d3326; --warn:#e0a53a; --warn-soft:#3a2d14; --bad:#e26a6a; --bad-soft:#3d1f1f; --hold:#7fa3d6; --hold-soft:#1e2a3a;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#141312; --surface:#1e1c1a; --surface2:#262320; --fg:#ece8e1; --muted:#a39d94; --line:#36322e;
+  --accent:#c9496f; --accent-fg:#1a0a10; --accent-soft:#3a1f29;
+  --ok:#6cc48a; --ok-soft:#1d3326; --warn:#e0a53a; --warn-soft:#3a2d14; --bad:#e26a6a; --bad-soft:#3d1f1f; --hold:#7fa3d6; --hold-soft:#1e2a3a;
+  color-scheme:dark }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:860px;margin:0 auto;padding-block:12px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+h1{font-family:var(--display);font-weight:700;font-size:30px;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 small{font-family:var(--body);font-weight:500;font-size:13px;color:var(--muted);margin-left:8px}
+.status{font-size:12px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0 14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;min-width:0;cursor:pointer}
+.tile[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:-2px}
+.tile .n{font-family:var(--display);font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tile .l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.tile.ok .n{color:var(--ok)} .tile.warn .n{color:var(--warn)} .tile.hold .n{color:var(--hold)}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.toolbar input[type=search]{flex:1 1 200px;min-width:0}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+textarea{min-height:72px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.list{display:flex;flex-direction:column;gap:8px}
+.card{display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;min-width:0}
+.card:hover{border-color:var(--accent)}
+.card .name{font-family:var(--display);font-weight:600;font-size:18px;line-height:1.2;min-width:0;overflow-wrap:anywhere}
+.card .sub{color:var(--muted);font-size:13px;min-width:0;overflow-wrap:anywhere}
+.card .right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.card .qty{font-variant-numeric:tabular-nums;font-weight:600}
+.pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.hold{background:var(--hold-soft);color:var(--hold)} .pill.none{background:var(--surface2);color:var(--muted)}
+.pill.tipo{background:var(--accent-soft);color:var(--accent)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 18px;text-align:center;color:var(--muted)}
+.empty b{color:var(--fg)}
+.fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-fg);border:0;border-radius:999px;padding:14px 20px;font-weight:700;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer;z-index:20}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* sheet */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;z-index:31;padding-block:14px calc(24px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:720px){.sheet{left:50%;right:auto;width:680px;transform:translateX(-50%);bottom:0}}
+.sheet h2{font-family:var(--display);font-size:24px;margin:4px 0 2px;line-height:1.15;text-wrap:balance}
+.sheet .meta{color:var(--muted);font-size:13px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media (max-width:520px){.grid3{grid-template-columns:1fr 1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-spacing:.03em}
+.field{min-width:0}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:10px 0}
+.sec h3{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:14px}
+.kv div:nth-child(odd){color:var(--muted)}
+.kv div{min-width:0;overflow-wrap:anywhere}
+.scores{display:flex;gap:8px;flex-wrap:wrap}
+.score{background:var(--surface2);border-radius:10px;padding:8px 10px;min-width:72px}
+.score .v{font-family:var(--display);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.score .s{font-size:11px;color:var(--muted)}
+.window{display:flex;align-items:center;gap:10px;margin:6px 0}
+.window .bar{flex:1;height:8px;border-radius:999px;background:var(--surface2);position:relative;overflow:hidden}
+.window .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ok);border-radius:999px}
+.window .bar .now{position:absolute;top:-3px;width:2px;height:14px;background:var(--fg)}
+.window .y{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted)}
+.hist{font-size:13px;display:flex;flex-direction:column;gap:4px}
+.hist div{display:flex;justify-content:space-between;gap:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:40;max-width:90%}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.pre{white-space:pre-wrap;font-size:14px}
+.thumb{width:28px;height:28px;object-fit:cover;border-radius:6px;vertical-align:-7px;margin-right:8px;background:var(--surface2)}
+.label-img{max-width:100%;max-height:260px;border-radius:var(--r);display:block;margin:0 auto 10px;background:var(--surface2)}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Minha Adega <small id="hdrCount"></small></h1>
+    <div class="status" id="status">Conectando ao banco…</div>
+  </header>
+
+  <div class="tiles" id="tiles">
+    <button class="tile" id="tTotal" data-f="todas" aria-pressed="true"><div class="n">–</div><div class="l">Garrafas</div></button>
+    <button class="tile ok" id="tAgora" data-f="agora"><div class="n">–</div><div class="l">Beber agora</div></button>
+    <button class="tile hold" id="tGuardar" data-f="guardar"><div class="n">–</div><div class="l">Guardar</div></button>
+    <button class="tile warn" id="tUrgente" data-f="urgente"><div class="n">–</div><div class="l">Beber logo</div></button>
+  </div>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Buscar produtor, vinho, região, uva…" aria-label="Buscar">
+    <select id="sort" aria-label="Ordenar">
+      <option value="janela">Ordenar: janela de consumo</option>
+      <option value="nome">Ordenar: nome</option>
+      <option value="safra">Ordenar: safra</option>
+      <option value="recentes">Ordenar: adicionados recentemente</option>
+    </select>
+  </div>
+  <div class="chips" id="tipoChips" style="margin-bottom:12px">
+    <button class="chip" data-t="" aria-pressed="true">Todos</button>
+    <button class="chip" data-t="Tinto">Tinto</button>
+    <button class="chip" data-t="Branco">Branco</button>
+    <button class="chip" data-t="Rosé">Rosé</button>
+    <button class="chip" data-t="Espumante">Espumante</button>
+    <button class="chip" data-t="Doce">Doce</button>
+    <button class="chip" data-t="Fortificado">Fortificado</button>
+    <button class="chip" data-t="bebidos">Já bebidos</button>
+  </div>
+
+  <div class="list" id="list">
+    <div class="empty"><b>Sua adega aparece aqui.</b><br>Toque em <b>+ Garrafa</b>, fotografe o rótulo e a ficha é preenchida para você.</div>
+  </div>
+
+  <div class="row" style="margin-top:18px;justify-content:space-between">
+    <button class="btn small" id="btnExport">Exportar CSV (CellarTracker)</button>
+    <span class="note" id="footNote"></span>
+  </div>
+</div>
+
+<button class="fab" id="fab">+ Garrafa</button>
+<div id="sheetHost"></div>
+<div id="toastHost"></div>
+
+<script>
+(() => {
+const YEAR = new Date().getFullYear();
+const TIPOS = ["Tinto","Branco","Rosé","Espumante","Doce","Fortificado"];
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const state = { db:null, sample:null, downloads:null, assets:null, comments:null, canImages:false, pendingFoto:null, wines:[], consumos:[], filter:"todas", tipo:"", q:"", sort:"janela", loaded:false, canWrite:true };
+const blobUrl = id => id ? "/_blob/" + encodeURIComponent(id) : "";
+
+/* ---------- window state ---------- */
+function janela(w){
+  const f = w.ficha || {};
+  const a = Number(f.janelaInicio) || null, b = Number(f.janelaFim) || null;
+  if (!a && !b) return {k:"none", label:"Sem janela", a, b};
+  if (a && YEAR < a) return {k:"hold", label:"Guardar", a, b};
+  if (b && YEAR > b) return {k:"bad", label:"Passou do ponto", a, b};
+  if (b && YEAR >= b - 1) return {k:"warn", label:"Beber logo", a, b};
+  return {k:"ok", label:"Beber agora", a, b};
+}
+function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
+
+/* ---------- render list ---------- */
+function filtered(){
+  let arr = state.wines.slice();
+  if (state.tipo === "bebidos") arr = arr.filter(w => (w.qtd|0) <= 0);
+  else {
+    arr = arr.filter(w => (w.qtd|0) > 0);
+    if (state.tipo) arr = arr.filter(w => w.tipo === state.tipo);
+  }
+  if (state.filter === "agora") arr = arr.filter(w => janela(w).k === "ok");
+  if (state.filter === "guardar") arr = arr.filter(w => janela(w).k === "hold");
+  if (state.filter === "urgente") arr = arr.filter(w => ["warn","bad"].includes(janela(w).k));
+  if (state.q){ const q = state.q.toLowerCase(); arr = arr.filter(w => [w.produtor,w.vinho,w.denominacao,w.regiao,w.pais,w.uvas,w.safra,w.loja].join(" ").toLowerCase().includes(q)); }
+  const rank = {warn:0, bad:1, ok:2, hold:3, none:4};
+  arr.sort((x,y) => {
+    if (state.sort === "nome") return nomeCompleto(x).localeCompare(nomeCompleto(y));
+    if (state.sort === "safra") return (Number(x.safra)||0) - (Number(y.safra)||0);
+    if (state.sort === "recentes") return (y.criadoEm||"").localeCompare(x.criadoEm||"");
+    const jx = janela(x), jy = janela(y);
+    if (rank[jx.k] !== rank[jy.k]) return rank[jx.k] - rank[jy.k];
+    return (jx.b||9999) - (jy.b||9999);
+  });
+  return arr;
+}
+function renderTiles(){
+  const ativos = state.wines.filter(w => (w.qtd|0) > 0);
+  const sum = (arr) => arr.reduce((n,w) => n + (w.qtd|0), 0);
+  $("#tTotal .n").textContent = sum(ativos);
+  $("#tAgora .n").textContent = sum(ativos.filter(w => janela(w).k === "ok"));
+  $("#tGuardar .n").textContent = sum(ativos.filter(w => janela(w).k === "hold"));
+  $("#tUrgente .n").textContent = sum(ativos.filter(w => ["warn","bad"].includes(janela(w).k)));
+  $("#hdrCount").textContent = ativos.length ? `${ativos.length} rótulos` : "";
+  document.querySelectorAll(".tile").forEach(t => t.setAttribute("aria-pressed", t.dataset.f === state.filter ? "true" : "false"));
+}
+function renderList(){
+  const list = $("#list");
+  const arr = filtered();
+  if (!state.loaded){ return; }
+  if (!arr.length){
+    list.innerHTML = state.wines.length
+      ? `<div class="empty">Nenhuma garrafa com esse filtro.</div>`
+      : `<div class="empty"><b>Sua adega aparece aqui.</b><br>Toque em <b>+ Garrafa</b>, fotografe o rótulo e a ficha é preenchida para você.</div>`;
+    return;
+  }
+  list.innerHTML = arr.map(w => {
+    const j = janela(w);
+    const sub = [w.denominacao, w.regiao || w.pais, w.uvas].filter(Boolean).join(" · ");
+    return `<div class="card" data-id="${esc(w.id)}" role="button" tabindex="0">
+      <div class="name">${w.fotoId ? `<img class="thumb" src="${esc(blobUrl(w.fotoId))}" alt="">` : ""}${esc(nomeCompleto(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></div>
+      <div class="right"><span class="qty">${w.qtd|0} gf</span><span class="pill ${j.k}">${esc(j.label)}${j.a||j.b ? ` ${j.a||"?"}–${j.b||"?"}` : ""}</span></div>
+      <div class="sub">${esc(sub)}</div>
+      <div class="right"><span class="pill tipo">${esc(w.tipo||"")}</span></div>
+    </div>`;
+  }).join("");
+}
+function renderAll(){ renderTiles(); renderList(); }
+
+/* ---------- sheet ---------- */
+function openSheet(html){
+  closeSheet();
+  const host = $("#sheetHost");
+  host.innerHTML = `<div class="sheet-bg" id="sheetBg"></div><div class="sheet" role="dialog" aria-modal="true" id="sheet">${html}</div>`;
+  $("#sheetBg").onclick = closeSheet;
+  document.body.style.overflow = "hidden";
+}
+function closeSheet(){ $("#sheetHost").innerHTML = ""; document.body.style.overflow = ""; }
+let toastT;
+function toast(msg){ const h=$("#toastHost"); h.innerHTML = `<div class="toast">${esc(msg)}</div>`; clearTimeout(toastT); toastT = setTimeout(()=>h.innerHTML="", 3200); }
+
+/* ---------- form (new / edit) ---------- */
+function formHtml(w = {}){
+  const opt = (v) => TIPOS.map(t => `<option ${t===(w.tipo||"Tinto")?"selected":""}>${t}</option>`).join("");
+  return `
+  <h2>${w.id ? "Editar garrafa" : "Nova garrafa"}</h2>
+  <div class="meta">${w.id ? "" : "Fotografe o rótulo e deixe o preenchimento comigo, ou digite."}</div>
+  <div class="row" style="margin-bottom:10px">
+    <input type="file" id="foto" accept="image/*" capture="environment" hidden>
+    <button class="btn ${w.id ? "" : "primary"}" id="btnFoto" type="button">📷 ${w.id ? (w.fotoId ? "Trocar foto do rótulo" : "Adicionar foto do rótulo") : "Identificar pelo rótulo"}</button>
+    <span class="note" id="fotoStatus"></span>
+  </div>
+  <form id="wform">
+    <div class="grid2">
+      <div class="field"><label for="f_produtor">Produtor</label><input id="f_produtor" value="${esc(w.produtor)}" required></div>
+      <div class="field"><label for="f_vinho">Vinho / cuvée</label><input id="f_vinho" value="${esc(w.vinho)}"></div>
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label for="f_safra">Safra</label><input id="f_safra" inputmode="numeric" value="${esc(w.safra)}" placeholder="2021 ou NV"></div>
+      <div class="field"><label for="f_tipo">Tipo</label><select id="f_tipo">${opt()}</select></div>
+      <div class="field"><label for="f_qtd">Garrafas</label><input id="f_qtd" type="number" min="0" value="${w.qtd ?? 1}"></div>
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label for="f_denominacao">Denominação</label><input id="f_denominacao" value="${esc(w.denominacao)}" placeholder="Toscana IGT"></div>
+      <div class="field"><label for="f_regiao">Região</label><input id="f_regiao" value="${esc(w.regiao)}"></div>
+      <div class="field"><label for="f_pais">País</label><input id="f_pais" value="${esc(w.pais)}"></div>
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <div class="field"><label for="f_uvas">Uvas</label><input id="f_uvas" value="${esc(w.uvas)}"></div>
+      <div class="field"><label for="f_tamanho">Tamanho</label><input id="f_tamanho" value="${esc(w.tamanho||"750ml")}"></div>
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label for="f_loja">Loja</label><input id="f_loja" value="${esc(w.loja)}"></div>
+      <div class="field"><label for="f_preco">Preço pago (R$)</label><input id="f_preco" inputmode="decimal" value="${esc(w.preco)}"></div>
+      <div class="field"><label for="f_data">Data da compra</label><input id="f_data" type="date" value="${esc(w.dataCompra)}"></div>
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <div class="field"><label for="f_local">Local na adega</label><input id="f_local" value="${esc(w.local)}" placeholder="Prateleira 2"></div>
+      <div class="field"><label for="f_obs">Observações</label><input id="f_obs" value="${esc(w.obs)}"></div>
+    </div>
+    <div class="row" style="margin-top:14px;justify-content:space-between">
+      <div class="row">
+        <button class="btn primary" type="submit" id="btnSave">${w.id ? "Salvar" : "Adicionar à adega"}</button>
+        <button class="btn" type="button" id="btnCancel">Cancelar</button>
+      </div>
+      ${w.id ? `<button class="btn danger small" type="button" id="btnDelete">Excluir</button>` : ""}
+    </div>
+    <div class="note" style="margin-top:8px">${w.id ? "" : "Ao adicionar, a ficha é gerada em seguida e um pedido de pesquisa de notas de terceiros (e de foto, se faltar) é enviado ao Claude."}</div>
+  </form>`;
+}
+function readForm(){
+  const v = id => ($("#"+id)?.value ?? "").trim();
+  return {
+    produtor:v("f_produtor"), vinho:v("f_vinho"), safra:v("f_safra"), tipo:v("f_tipo"), qtd:Math.max(0, parseInt(v("f_qtd")||"0",10)||0),
+    denominacao:v("f_denominacao"), regiao:v("f_regiao"), pais:v("f_pais"), uvas:v("f_uvas"), tamanho:v("f_tamanho")||"750ml",
+    loja:v("f_loja"), preco:v("f_preco"), dataCompra:v("f_data"), local:v("f_local"), obs:v("f_obs")
+  };
+}
+function fillForm(d){
+  const set = (id, val) => { const el = $("#"+id); if (el && val !== undefined && val !== null && String(val) !== "") el.value = String(val); };
+  set("f_produtor", d.produtor); set("f_vinho", d.vinho); set("f_safra", d.safra); set("f_denominacao", d.denominacao);
+  set("f_regiao", d.regiao); set("f_pais", d.pais); set("f_uvas", d.uvas); set("f_tamanho", d.tamanho);
+  if (d.tipo && TIPOS.includes(d.tipo)) $("#f_tipo").value = d.tipo;
+}
+function openForm(w){
+  state.pendingFoto = null;
+  openSheet(formHtml(w || {}));
+  $("#btnCancel").onclick = w && w.id ? () => openDetail(w.id) : closeSheet;
+  const foto = $("#foto"), btnFoto = $("#btnFoto");
+  const isEdit = !!(w && w.id);
+  if (isEdit ? !state.assets : (!state.sample || !state.canImages)) btnFoto.hidden = true;
+  btnFoto.onclick = () => foto.click();
+  foto.onchange = () => isEdit ? guardarFoto(foto.files[0]) : identificar(foto.files[0]);
+  if (isEdit) $("#btnDelete").onclick = () => confirmDelete(w);
+  $("#wform").onsubmit = async (e) => {
+    e.preventDefault();
+    const d = readForm();
+    if (!d.produtor && !d.vinho){ toast("Informe ao menos o produtor ou o vinho."); return; }
+    if (state.pendingFoto) d.fotoId = state.pendingFoto;
+    $("#btnSave").disabled = true;
+    try {
+      if (isEdit){
+        await state.db.doc("vinhos/"+w.id).update(d);
+        toast("Salvo."); openDetail(w.id);
+      } else {
+        d.criadoEm = new Date().toISOString(); d.ficha = null; d.pesquisa = { status:"pendente", pedidoEm:new Date().toISOString() };
+        const ref = await state.db.collection("vinhos").add(d);
+        closeSheet(); toast("Adicionada. Gerando ficha…");
+        pedirPesquisa(ref.id, d);
+        gerarFicha({...d, id:ref.id}, true);
+      }
+    } catch(err){ toast(dbErr(err)); $("#btnSave").disabled = false; }
+  };
+}
+async function guardarFoto(file){
+  if (!file || !state.assets) return;
+  const st = $("#fotoStatus"); st.innerHTML = `<span class="spin"></span>Enviando foto…`;
+  try { const r = await state.assets.upload(file); state.pendingFoto = r.id; st.textContent = "Foto pronta. Salve para gravar."; }
+  catch(e){ st.textContent = e.code === "quota_exceeded" ? "Sem espaço para fotos." : "Não consegui enviar a foto."; }
+}
+/* ---------- research request to Claude (wakes the building session) ---------- */
+function pedidoTexto(id, w){
+  return `Pesquisar avaliações de terceiros, preço de mercado${w.fotoId ? "" : " e foto do rótulo"} para: ${nomeCompleto(w)} ${w.safra||""} (${[w.tipo,w.denominacao,w.regiao,w.pais].filter(Boolean).join(", ")}). Documento vinhos/${id}.`;
+}
+async function pedirPesquisa(id, w, manual){
+  const fail = async (why) => { if (manual) toast(why); try { await state.db.doc("vinhos/"+id).update({ pesquisa:{ status:"pendente", pedidoEm:new Date().toISOString(), motivo:why } }); } catch {} };
+  if (!state.comments) return fail("Pedido guardado: o Claude pesquisa na próxima varredura.");
+  try {
+    const can = await state.comments.canSendToClaude();
+    if (can !== "available") return fail(can === "no_session" ? "Nenhuma sessão do Claude acompanhando agora. Fica pendente para a próxima varredura." : "Envio ao Claude indisponível aqui. Fica pendente.");
+    const anchor = await state.comments.anchorFor($("#list"));
+    const r = await state.comments.sendToClaude({ anchor, text: pedidoTexto(id, w) });
+    await state.db.doc("vinhos/"+id).update({ pesquisa:{ status:"solicitada", pedidoEm:new Date().toISOString(), threadId:r.threadId } });
+    toast("Pedido de pesquisa enviado ao Claude.");
+  } catch(e){
+    if (e.code === "consent_required" || e.code === "not_granted") return fail("Pedido não autorizado. Fica pendente para a próxima varredura.");
+    if (e.code === "rate_limited") return fail("Muitos pedidos seguidos. Fica pendente.");
+    return fail("Não consegui enviar o pedido agora. Fica pendente.");
+  }
+}
+function dbErr(e){
+  const c = e && e.code;
+  if (c === "quota_exceeded") return "Limite do banco atingido. Apague itens antigos.";
+  if (c === "invalid_argument") { state.canWrite = false; return "Sem permissão para gravar nesta visualização."; }
+  if (c === "resource_exhausted") return "Muitas operações seguidas. Tente de novo em instantes.";
+  return "Não foi possível gravar agora. Tente novamente.";
+}
+async function confirmDelete(w){
+  openSheet(`<h2>Excluir ${esc(nomeCompleto(w))} ${esc(w.safra||"")}?</h2><div class="meta">O histórico de consumo dessa garrafa também some da lista.</div>
+    <div class="row"><button class="btn danger" id="yes">Excluir</button><button class="btn" id="no">Cancelar</button></div>`);
+  $("#no").onclick = () => openDetail(w.id);
+  $("#yes").onclick = async () => { try { await state.db.doc("vinhos/"+w.id).delete(); closeSheet(); toast("Excluída."); } catch(e){ toast(dbErr(e)); } };
+}
+
+/* ---------- identify by label ---------- */
+async function identificar(file){
+  if (!file) return;
+  const st = $("#fotoStatus"); st.innerHTML = `<span class="spin"></span>Lendo o rótulo…`;
+  const prompt = `Esta é a foto do rótulo de uma garrafa de vinho. Identifique o vinho e responda APENAS com um objeto JSON com estas chaves (string vazia quando não souber): {"produtor":"","vinho":"","safra":"","tipo":"","denominacao":"","regiao":"","pais":"","uvas":"","tamanho":"750ml"}. "tipo" deve ser um de: Tinto, Branco, Rosé, Espumante, Doce, Fortificado. "safra" é o ano com 4 dígitos ou "NV". "vinho" é o nome da cuvée sem o produtor. Use o conhecimento que tiver sobre o produtor para preencher denominação, região, país e uvas mesmo que não estejam no rótulo. Exemplo: {"produtor":"Jacopo Biondi Santi","vinho":"Sassoalloro","safra":"2021","tipo":"Tinto","denominacao":"Toscana IGT","regiao":"Toscana, Maremma","pais":"Itália","uvas":"Sangiovese","tamanho":"750ml"}`;
+  try {
+    const up = state.assets ? state.assets.upload(file).then(r => { state.pendingFoto = r.id; }).catch(() => {}) : Promise.resolve();
+    const d = await state.sample.json(prompt, { images:[file], modelTier:"default" });
+    await up;
+    if (d && typeof d === "object"){ fillForm(d); st.textContent = "Rótulo lido. Confira os campos."; }
+    else st.textContent = "Não consegui ler. Digite os dados.";
+  } catch(e){
+    st.textContent = e.code === "not_granted" ? "Leitura de rótulo não autorizada." : e.code === "rate_limited" ? "Muitas leituras seguidas. Aguarde um pouco." : "Não consegui ler o rótulo. Tente outra foto ou digite.";
+  }
+}
+
+/* ---------- ficha (enrichment) ---------- */
+function fichaPrompt(w){
+  return `Você é um sommelier experiente. Monte a ficha técnica do vinho abaixo para um colecionador que quer saber quando beber. Ano atual: ${YEAR}.
+Vinho: ${nomeCompleto(w)} ${w.safra||""}. Tipo: ${w.tipo||""}. Denominação: ${w.denominacao||""}. Região: ${w.regiao||""}, ${w.pais||""}. Uvas: ${w.uvas||""}.
+Responda APENAS com um objeto JSON com estas chaves:
+{"resumo":"2 frases sobre o produtor e o que é este vinho","estilo":"1 frase sobre perfil de aroma, corpo, tanino, acidez","uvas":"uvas do blend se souber","vinificacao":"estágio em madeira, se souber","janelaInicio":2024,"janelaFim":2031,"apice":2027,"estadoHoje":"frase curta: 'guardar', 'beber agora', 'no ápice', 'beber logo' ou 'passou do ponto', com 1 justificativa sobre a safra","safraComentario":"1 frase sobre a qualidade da safra nessa região","decantar":"ex: '45 min a 1 h' ou 'não precisa'","temperatura":"ex: '16 a 18 °C'","harmonizacao":"3 a 5 sugestões concretas de pratos, separadas por ponto e vírgula","notas":{"suckling":null,"parker":null,"spectator":null,"vivino":null},"precoEstimado":"faixa de preço de varejo no Brasil em reais, ex: 'R$ 300 a 400', ou null","confianca":"alta|média|baixa","observacoes":"qualquer alerta: safra fraca, risco de garrafa, versão comemorativa, etc."}
+Regras: anos como números. Em "notas", só preencha quando tiver confiança razoável na nota real dessa safra ou de safras vizinhas; caso contrário null. Vivino é escala 1 a 5. "precoEstimado" é uma estimativa do preço em importadoras brasileiras (Mistral, Grand Cru, World Wine); se não tiver ideia, null. Não invente. Se não conhecer o vinho, estime a janela pelo tipo, região e safra e marque confianca "baixa".`;
+}
+async function gerarFicha(w, auto){
+  if (!state.sample) { if(!auto) toast("Geração de ficha indisponível aqui."); return; }
+  try {
+    const f = await state.sample.json(fichaPrompt(w), { modelTier:"default", cache:false });
+    if (!f || typeof f !== "object") throw {code:"invalid_json"};
+    f.atualizadoEm = new Date().toISOString();
+    await state.db.doc("vinhos/"+w.id).update({ ficha:f });
+    toast(`Ficha pronta: ${nomeCompleto(w)}`);
+    if ($("#sheet") && $("#sheet").dataset.id === w.id) openDetail(w.id);
+  } catch(e){
+    const msg = e.code === "not_granted" ? "Ficha não gerada: uso do Claude não autorizado nesta página." : e.code === "rate_limited" ? "Muitas fichas seguidas. Tente de novo em instantes." : "Não consegui gerar a ficha agora. Abra a garrafa e toque em Gerar ficha.";
+    toast(msg);
+  }
+}
+
+/* ---------- detail ---------- */
+function openDetail(id){
+  const w = state.wines.find(x => x.id === id); if (!w) { closeSheet(); return; }
+  const f = w.ficha || null; const j = janela(w);
+  const hist = state.consumos.filter(c => c.vinhoId === id).sort((a,b)=> (b.data||"").localeCompare(a.data||""));
+  const nota = (v) => v === null || v === undefined || v === "" ? null : v;
+  const scores = f && f.notas ? [["suckling","Suckling"],["parker","Parker"],["spectator","Spectator"],["vivino","Vivino"]].filter(([k]) => nota(f.notas[k]) !== null).map(([k,l]) => `<div class="score"><div class="v">${esc(f.notas[k])}</div><div class="s">${l}</div></div>`).join("") : "";
+  let winBar = "";
+  if (j.a && j.b){
+    const lo = Math.min(j.a, YEAR) - 1, hi = Math.max(j.b, YEAR) + 1, span = hi - lo;
+    const left = ((j.a - lo)/span*100).toFixed(1), width = ((j.b - j.a)/span*100).toFixed(1), now = ((YEAR - lo)/span*100).toFixed(1);
+    winBar = `<div class="window"><span class="y">${lo+1}</span><div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div><div class="now" style="left:${now}%"></div></div><span class="y">${hi-1}</span></div>`;
+  }
+  const html = `
+  <div data-id="${esc(id)}"></div>
+  <div class="row" style="justify-content:space-between">
+    <span class="pill ${j.k}">${esc(j.label)}</span>
+    <span class="row"><button class="btn small" id="btnEdit">Editar</button><button class="btn small" id="btnClose">Fechar</button></span>
+  </div>
+  <h2>${esc(nomeCompleto(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></h2>
+  <div class="meta">${esc([w.tipo, w.denominacao, w.regiao, w.pais].filter(Boolean).join(" · "))}${w.uvas ? " · " + esc(w.uvas) : ""}</div>
+  ${w.fotoId ? `<img class="label-img" src="${esc(blobUrl(w.fotoId))}" alt="Rótulo de ${esc(nomeCompleto(w))}">` : ""}
+  <div class="row" style="margin-bottom:6px">
+    <span class="qty" style="font-weight:700">${w.qtd|0} garrafa${(w.qtd|0)===1?"":"s"}</span>
+    ${(w.qtd|0) > 0 ? `<button class="btn primary small" id="btnBebi">🍷 Bebi uma</button>` : `<span class="note">Sem garrafas na adega.</span>`}
+  </div>
+  <div class="sec">
+    <h3>Quando beber</h3>
+    ${f ? `${winBar}<div class="kv">
+      <div>Janela</div><div>${esc(f.janelaInicio||"?")} a ${esc(f.janelaFim||"?")}${f.apice ? ` · ápice por volta de ${esc(f.apice)}` : ""}</div>
+      <div>Hoje</div><div>${esc(f.estadoHoje||"")}</div>
+      <div>Safra</div><div>${esc(f.safraComentario||"")}</div>
+      <div>Decantar</div><div>${esc(f.decantar||"")}</div>
+      <div>Servir a</div><div>${esc(f.temperatura||"")}</div>
+    </div>` : `<div class="note">Ficha ainda não gerada.</div>`}
+  </div>
+  ${f ? `<div class="sec"><h3>Harmonização</h3><div>${esc(f.harmonizacao||"")}</div></div>
+  <div class="sec"><h3>Sobre o vinho</h3><div class="pre">${esc(f.resumo||"")}${f.estilo ? "\n\n" + esc(f.estilo) : ""}${f.vinificacao ? "\n\n" + esc(f.vinificacao) : ""}</div>
+    ${f.observacoes ? `<div class="note" style="margin-top:8px">⚠ ${esc(f.observacoes)}</div>` : ""}</div>
+  <div class="sec"><h3>Notas</h3>${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
+    ${f.fontes && f.fontes.length ? `<div class="note" style="margin-top:8px">Fontes: ${f.fontes.map(s => esc(s)).join("; ")}</div>` : ""}
+    <div class="note" style="margin-top:8px">${f.verificadaEm ? `Notas verificadas em fontes externas em ${esc(f.verificadaEm.slice(0,10))}.` : `Confiança da ficha: ${esc(f.confianca||"?")}. Gerada ${f.atualizadoEm ? "em " + esc(f.atualizadoEm.slice(0,10)) : ""} a partir do conhecimento do Claude, sem consulta à internet.`}</div></div>` : ""}
+  <div class="sec"><h3>Pesquisa de terceiros</h3>
+    <div class="row" style="justify-content:space-between">
+      <span class="note">${pesquisaLabel(w)}</span>
+      ${(w.pesquisa && w.pesquisa.status === "feita") ? "" : `<button class="btn small" id="btnPesq">Pedir pesquisa ao Claude</button>`}
+    </div></div>
+  <div class="sec"><h3>Compra</h3><div class="kv">
+    <div>Loja</div><div>${esc(w.loja||"—")}</div><div>Preço pago</div><div>${w.preco ? "R$ " + esc(w.preco) : "—"}</div><div>Preço de mercado</div><div>${f && f.precoEstimado ? esc(f.precoEstimado) + (f.verificadaEm ? "" : " (estimativa)") : "—"}</div><div>Data</div><div>${esc(w.dataCompra||"—")}</div><div>Local</div><div>${esc(w.local||"—")}</div><div>Obs.</div><div>${esc(w.obs||"—")}</div>
+  </div></div>
+  ${hist.length ? `<div class="sec"><h3>Histórico</h3><div class="hist">${hist.map(c => `<div><span>${esc(c.data||"")}${c.nota ? " · nota " + esc(c.nota) : ""}</span><span style="color:var(--muted);text-align:right">${esc(c.comentario||"")}</span></div>`).join("")}</div></div>` : ""}
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="btnFicha" ${state.sample ? "" : "disabled"}>${f ? "Atualizar ficha" : "Gerar ficha"}</button>
+    <span class="note" id="fichaStatus"></span>
+  </div>`;
+  openSheet(html);
+  $("#sheet").dataset.id = id;
+  $("#btnClose").onclick = closeSheet;
+  $("#btnEdit").onclick = () => openForm(w);
+  $("#btnFicha").onclick = async () => { $("#btnFicha").disabled = true; $("#fichaStatus").innerHTML = `<span class="spin"></span>Consultando…`; await gerarFicha(w, false); if ($("#btnFicha")) $("#btnFicha").disabled = false; if ($("#fichaStatus")) $("#fichaStatus").textContent = ""; };
+  const bebi = $("#btnBebi"); if (bebi) bebi.onclick = () => openBebi(w);
+  const pq = $("#btnPesq"); if (pq) pq.onclick = async () => { pq.disabled = true; await pedirPesquisa(w.id, w, true); };
+}
+function pesquisaLabel(w){
+  const p = w.pesquisa; if (!p) return "Nenhum pedido feito.";
+  if (p.status === "feita") return `Feita em ${(p.feitaEm||"").slice(0,10)}.`;
+  if (p.status === "solicitada") return `Pedido enviado em ${(p.pedidoEm||"").slice(0,10)}, aguardando resposta.`;
+  return `Pendente${p.motivo ? ": " + p.motivo : ""}`;
+}
+function openBebi(w){
+  openSheet(`<h2>Bebi uma garrafa</h2><div class="meta">${esc(nomeCompleto(w))} ${esc(w.safra||"")}</div>
+    <div class="grid2"><div class="field"><label for="b_data">Data</label><input id="b_data" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label for="b_nota">Sua nota (50 a 100)</label><input id="b_nota" type="number" min="50" max="100" placeholder="92"></div></div>
+    <div class="field" style="margin-top:10px"><label for="b_com">Como estava?</label><textarea id="b_com" placeholder="Decantei 1 h. Fruta ainda viva, tanino macio. No ponto."></textarea></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="b_ok">Registrar</button><button class="btn" id="b_cancel">Cancelar</button></div>`);
+  $("#b_cancel").onclick = () => openDetail(w.id);
+  $("#b_ok").onclick = async () => {
+    $("#b_ok").disabled = true;
+    try {
+      await state.db.collection("consumos").add({ vinhoId:w.id, nome:nomeCompleto(w), safra:w.safra||"", data:$("#b_data").value, nota:$("#b_nota").value, comentario:$("#b_com").value.trim(), criadoEm:new Date().toISOString() });
+      await state.db.doc("vinhos/"+w.id).update({ qtd: Math.max(0,(w.qtd|0)-1) });
+      toast("Registrado. Saúde!"); closeSheet();
+    } catch(e){ toast(dbErr(e)); $("#b_ok").disabled = false; }
+  };
+}
+
+/* ---------- export ---------- */
+function csvCell(v){ v = String(v ?? ""); return /[",\n;]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; }
+async function exportCsv(){
+  const cols = ["BottleState","Vintage","UserWine1","UserWine2","UserWine3","UserWine4","Quantity","BottleSize","Store","PurchaseDate","Cost","Currency","StorageLocation","Bin","BeginDrinking","EndDrinking","BottleNote"];
+  const rows = state.wines.filter(w => (w.qtd|0) > 0).map(w => [1, w.safra||"", w.produtor||"", w.vinho||"", w.denominacao||"", [w.pais,w.regiao].filter(Boolean).join(", "), w.qtd|0, w.tamanho||"750ml", w.loja||"", w.dataCompra||"", w.preco||"", w.preco ? "BRL" : "", w.local||"", "", w.ficha?.janelaInicio||"", w.ficha?.janelaFim||"", w.obs||""]);
+  const csv = [cols, ...rows].map(r => r.map(csvCell).join(",")).join("\n");
+  if (state.downloads){
+    try { await state.downloads.save({ filename:"adega-cellartracker.csv", data:"﻿"+csv }); toast("CSV salvo."); }
+    catch(e){ if (e.code !== "declined") toast("Não foi possível salvar o arquivo aqui."); }
+  } else {
+    try { await navigator.clipboard.writeText(csv); toast("Download indisponível aqui. CSV copiado para a área de transferência."); } catch { toast("Download indisponível nesta visualização."); }
+  }
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll(".tile").forEach(t => t.onclick = () => { state.filter = t.dataset.f; renderAll(); });
+document.querySelectorAll("#tipoChips .chip").forEach(c => c.onclick = () => { state.tipo = c.dataset.t; document.querySelectorAll("#tipoChips .chip").forEach(x => x.setAttribute("aria-pressed", x===c ? "true":"false")); renderList(); });
+$("#q").oninput = (e) => { state.q = e.target.value.trim(); renderList(); };
+$("#sort").onchange = (e) => { state.sort = e.target.value; renderList(); };
+$("#list").onclick = (e) => { const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); };
+$("#list").onkeydown = (e) => { if (e.key === "Enter"){ const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id); } };
+$("#fab").onclick = () => { if (!state.db){ toast("Banco ainda não disponível."); return; } openForm(null); };
+$("#btnExport").onclick = exportCsv;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+(async () => {
+  const [db, sample, downloads, assets, comments] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("assets"), claude.use("comments")]);
+  state.db = db; state.sample = sample; state.downloads = downloads; state.assets = assets; state.comments = comments;
+  if (sample){ try { const lim = await sample.limits(); state.canImages = !!lim.images; } catch { state.canImages = false; } }
+  $("#footNote").textContent = sample ? (state.canImages ? "Leitura de rótulo e fichas pelo Claude ativas." : "Fichas pelo Claude ativas; leitura de rótulo indisponível aqui.") : "Claude indisponível nesta visualização: cadastro manual.";
+  if (!db){ $("#status").textContent = "Banco indisponível nesta visualização."; state.loaded = true; renderAll(); return; }
+  let timer = setTimeout(() => { $("#status").textContent = "Ainda carregando… os dados podem estar desatualizados."; }, 10000);
+  db.collection("vinhos").onSnapshot(snap => {
+    state.wines = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    state.loaded = true;
+    if (!snap.metadata.fromCache){ clearTimeout(timer); $("#status").textContent = "Sincronizado"; }
+    renderAll();
+    const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#b_ok")) openDetail(sh.dataset.id);
+  }, err => { clearTimeout(timer); $("#status").textContent = "Não foi possível carregar a adega."; state.loaded = true; renderAll(); });
+  db.collection("consumos").onSnapshot(snap => { state.consumos = snap.docs.map(d => ({ id:d.id, ...d.data() })); }, () => {});
+})();
+})();
+</script>
