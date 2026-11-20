@@ -53,7 +53,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .card .right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .card .qty{font-variant-numeric:tabular-nums;font-weight:600}
 .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
-.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.hold{background:var(--hold-soft);color:var(--hold)} .pill.none{background:var(--surface2);color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.hold{background:var(--hold-soft);color:var(--hold)} .pill.young{background:var(--hold-soft);color:var(--hold);border:1px dashed var(--hold)} .pill.none{background:var(--surface2);color:var(--muted)}
 .pill.tipo{background:var(--accent-soft);color:var(--accent)}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 18px;text-align:center;color:var(--muted)}
 .empty b{color:var(--fg)}
@@ -88,6 +88,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 .window .bar{flex:1;height:8px;border-radius:999px;background:var(--surface2);position:relative;overflow:hidden}
 .window .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ok);border-radius:999px}
 .window .bar .now{position:absolute;top:-3px;width:2px;height:14px;background:var(--fg)}
+.window .bar .apx{position:absolute;top:-2px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
 .window .y{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .note{font-size:13px;color:var(--muted)}
 .hist{font-size:13px;display:flex;flex-direction:column;gap:4px}
@@ -194,6 +195,17 @@ const state = { db:null, sample:null, downloads:null, assets:null, comments:null
 const blobUrl = id => id ? "/_blob/" + encodeURIComponent(id) : "";
 
 /* ---------- window state ---------- */
+/*
+ Regra do estado (ano corrente = YEAR):
+   antes da janela ............................ Guardar
+   últimos 2 anos da janela ................... Beber logo
+   depois da janela ........................... Passou do ponto
+   dentro da janela, mais de 2 anos antes do ápice
+     e janela longa (6+ anos) ................. Já dá, melhor guardar   (conta como Guardar)
+   dentro da janela, a 1 ano do ápice ......... No ápice               (conta como Pronto)
+   dentro da janela, demais casos ............. Pronto para beber
+ O ápice vem da ficha; sem ele, usa-se o meio da janela.
+*/
 function janela(w){
   const f = w.ficha || {};
   const a = Number(f.janelaInicio) || null, b = Number(f.janelaFim) || null;
@@ -201,7 +213,11 @@ function janela(w){
   if (a && YEAR < a) return {k:"hold", label:"Guardar", a, b};
   if (b && YEAR > b) return {k:"bad", label:"Passou do ponto", a, b};
   if (b && YEAR >= b - 1) return {k:"warn", label:"Beber logo", a, b};
-  return {k:"ok", label:"Pronto para beber", a, b};
+  const ap = Number(f.apice) || (a && b ? Math.round((a + b) / 2) : null);
+  const span = a && b ? b - a : 0;
+  if (ap && span >= 6 && YEAR < ap - 2) return {k:"young", label:"Já dá, melhor guardar", a, b, ap};
+  if (ap && Math.abs(YEAR - ap) <= 1) return {k:"ok", label:"No ápice", a, b, ap};
+  return {k:"ok", label:"Pronto para beber", a, b, ap};
 }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
 /* [key, short label for cards, long label for the detail sheet] */
@@ -227,10 +243,10 @@ function filtered(){
     if (state.tipo) arr = arr.filter(w => w.tipo === state.tipo);
   }
   if (state.filter === "agora") arr = arr.filter(w => janela(w).k === "ok");
-  if (state.filter === "guardar") arr = arr.filter(w => janela(w).k === "hold");
+  if (state.filter === "guardar") arr = arr.filter(w => ["hold","young"].includes(janela(w).k));
   if (state.filter === "urgente") arr = arr.filter(w => ["warn","bad"].includes(janela(w).k));
   if (state.q){ const q = state.q.toLowerCase(); arr = arr.filter(w => [w.produtor,w.vinho,w.denominacao,w.regiao,w.pais,w.uvas,w.safra,w.loja].join(" ").toLowerCase().includes(q)); }
-  const rank = {warn:0, bad:1, ok:2, hold:3, none:4};
+  const rank = {warn:0, bad:1, ok:2, young:3, hold:4, none:5};
   arr.sort((x,y) => {
     if (state.sort === "nome") return nomeCompleto(x).localeCompare(nomeCompleto(y));
     if (state.sort === "safra") return (Number(x.safra)||0) - (Number(y.safra)||0);
@@ -246,7 +262,7 @@ function renderTiles(){
   const sum = (arr) => arr.reduce((n,w) => n + (w.qtd|0), 0);
   $("#tTotal .n").textContent = sum(ativos);
   $("#tAgora .n").textContent = sum(ativos.filter(w => janela(w).k === "ok"));
-  $("#tGuardar .n").textContent = sum(ativos.filter(w => janela(w).k === "hold"));
+  $("#tGuardar .n").textContent = sum(ativos.filter(w => ["hold","young"].includes(janela(w).k)));
   $("#tUrgente .n").textContent = sum(ativos.filter(w => ["warn","bad"].includes(janela(w).k)));
   $("#hdrCount").textContent = ativos.length ? `${ativos.length} rótulos` : "";
   document.querySelectorAll(".tile").forEach(t => t.setAttribute("aria-pressed", t.dataset.f === state.filter ? "true" : "false"));
@@ -475,7 +491,9 @@ function openDetail(id){
   if (j.a && j.b){
     const lo = Math.min(j.a, YEAR) - 1, hi = Math.max(j.b, YEAR) + 1, span = hi - lo;
     const left = ((j.a - lo)/span*100).toFixed(1), width = ((j.b - j.a)/span*100).toFixed(1), now = ((YEAR - lo)/span*100).toFixed(1);
-    winBar = `<div class="window"><span class="y">${lo+1}</span><div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div><div class="now" style="left:${now}%"></div></div><span class="y">${hi-1}</span></div>`;
+    const apx = j.ap ? ((j.ap - lo)/span*100).toFixed(1) : null;
+    winBar = `<div class="window"><span class="y">${lo+1}</span><div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div>${apx ? `<div class="apx" style="left:${apx}%" title="ápice ${j.ap}"></div>` : ""}<div class="now" style="left:${now}%"></div></div><span class="y">${hi-1}</span></div>
+    <div class="note" style="margin-bottom:6px">Barra: janela de consumo. Traço preto: hoje. Ponto: ápice estimado${j.ap ? " (" + j.ap + ")" : ""}.</div>`;
   }
   const html = `
   <div data-id="${esc(id)}"></div>
