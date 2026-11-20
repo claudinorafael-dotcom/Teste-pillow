@@ -88,7 +88,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 .window .bar{flex:1;height:8px;border-radius:999px;background:var(--surface2);position:relative;overflow:hidden}
 .window .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ok);border-radius:999px}
 .window .bar .now{position:absolute;top:-3px;width:2px;height:14px;background:var(--fg)}
-.window .bar .apx{position:absolute;top:-2px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
+.window .bar .apb{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.85;border-radius:4px}
 .window .y{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .note{font-size:13px;color:var(--muted)}
 .hist{font-size:13px;display:flex;flex-direction:column;gap:4px}
@@ -261,11 +261,13 @@ async function shrinkImage(file, max = 1600){
    antes da janela ............................ Guardar
    últimos 2 anos da janela ................... Beber logo
    depois da janela ........................... Passou do ponto
-   dentro da janela, mais de 2 anos antes do ápice
-     e janela longa (6+ anos) ................. Já dá, melhor guardar   (conta como Guardar)
-   dentro da janela, a 1 ano do ápice ......... No ápice               (conta como Pronto)
+   dentro da janela, janela longa (6+ anos) e
+     mais de 1 ano antes da faixa de ápice .... Já dá, ápice a partir de X   (conta como Guardar)
+   dentro da faixa de ápice ................... No ápice               (conta como Pronto)
+   depois da faixa, antes do fim .............. Pronto, após o ápice   (conta como Pronto)
    dentro da janela, demais casos ............. Pronto para beber
- O ápice vem da ficha; sem ele, usa-se o meio da janela.
+ A faixa de ápice (3 anos) vem da ficha (apiceInicio/apiceFim); sem ela, é o ápice ±1 ano,
+ e sem ápice usa-se o meio da janela.
 */
 function janela(w){
   const f = w.ficha || {};
@@ -276,9 +278,13 @@ function janela(w){
   if (b && YEAR >= b - 1) return {k:"warn", label:"Beber logo", a, b};
   const ap = Number(f.apice) || (a && b ? Math.round((a + b) / 2) : null);
   const span = a && b ? b - a : 0;
-  if (ap && span >= 6 && YEAR < ap - 2) return {k:"young", label:"Já dá, melhor guardar", a, b, ap};
-  if (ap && Math.abs(YEAR - ap) <= 1) return {k:"ok", label:"No ápice", a, b, ap};
-  return {k:"ok", label:"Pronto para beber", a, b, ap};
+  let p1 = Number(f.apiceInicio) || null, p2 = Number(f.apiceFim) || null;
+  if (!(p1 && p2 && p2 >= p1) && ap){ p1 = ap - 1; p2 = ap + 1; }
+  if (p1 && a) p1 = Math.max(p1, a); if (p2 && b) p2 = Math.min(p2, b);
+  if (p1 && span >= 6 && YEAR < p1 - 1) return {k:"young", label:`Já dá, ápice a partir de ${p1}`, a, b, ap, p1, p2};
+  if (p1 && p2 && YEAR >= p1 && YEAR <= p2) return {k:"ok", label:"No ápice", a, b, ap, p1, p2};
+  if (p2 && YEAR > p2) return {k:"ok", label:"Pronto, após o ápice", a, b, ap, p1, p2};
+  return {k:"ok", label:"Pronto para beber", a, b, ap, p1, p2};
 }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
 /* [key, short label for cards, long label for the detail sheet] */
@@ -722,9 +728,9 @@ function openDetail(id){
   if (j.a && j.b){
     const lo = Math.min(j.a, YEAR) - 1, hi = Math.max(j.b, YEAR) + 1, span = hi - lo;
     const left = ((j.a - lo)/span*100).toFixed(1), width = ((j.b - j.a)/span*100).toFixed(1), now = ((YEAR - lo)/span*100).toFixed(1);
-    const apx = j.ap ? ((j.ap - lo)/span*100).toFixed(1) : null;
-    winBar = `<div class="window"><span class="y">${lo+1}</span><div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div>${apx ? `<div class="apx" style="left:${apx}%" title="ápice ${j.ap}"></div>` : ""}<div class="now" style="left:${now}%"></div></div><span class="y">${hi-1}</span></div>
-    <div class="note" style="margin-bottom:6px">Barra: janela de consumo. Traço preto: hoje. Ponto: ápice estimado${j.ap ? " (" + j.ap + ")" : ""}.</div>`;
+    const pk = j.p1 && j.p2 ? `<div class="apb" style="left:${((j.p1 - lo)/span*100).toFixed(1)}%;width:${((j.p2 + 1 - j.p1)/span*100).toFixed(1)}%" title="ápice ${j.p1} a ${j.p2}"></div>` : "";
+    winBar = `<div class="window"><span class="y">${lo+1}</span><div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div>${pk}<div class="now" style="left:${now}%"></div></div><span class="y">${hi-1}</span></div>
+    <div class="note" style="margin-bottom:6px">Barra: janela de consumo. Faixa escura: ápice estimado${j.p1 ? " (" + j.p1 + " a " + j.p2 + ")" : ""}. Traço preto: hoje.</div>`;
   }
   const html = `
   <div data-id="${esc(id)}"></div>
@@ -743,7 +749,7 @@ function openDetail(id){
   <div class="sec">
     <h3>Quando beber</h3>
     ${f ? `${winBar}<div class="kv">
-      <div>Janela</div><div>${esc(f.janelaInicio||"?")} a ${esc(f.janelaFim||"?")}${f.apice ? ` · ápice por volta de ${esc(f.apice)}` : ""}</div>
+      <div>Janela</div><div>${esc(f.janelaInicio||"?")} a ${esc(f.janelaFim||"?")}${j.p1 ? ` · ápice ${esc(j.p1)} a ${esc(j.p2)}` : ""}</div>
       <div>Hoje</div><div>${esc(f.estadoHoje||"")}</div>
       <div>Safra</div><div>${esc(f.safraComentario||"")}</div>
       <div>Decantar</div><div>${esc(f.decantar||"")}</div>
