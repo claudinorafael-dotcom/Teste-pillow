@@ -19,11 +19,34 @@ Banco: coleções `vinhos`, `consumos` e `pesquisas` (ArtifactData). Fotos: asse
    a conversa que construiu a página.
 Em qualquer caso, consultar **todos** os documentos pendentes de `vinhos` e `pesquisas`, não só o citado.
 
+## Fonte primária: Wine-Searcher via Apify (decisão de 24/11/2026)
+
+Testado com os 16 rótulos: 16 itens em 30 s, 14 com página, 10 com notas por crítico, custo US$ 0,045. Entra como
+**primeiro passo** da pesquisa de notas e preço; a busca na web vira complemento.
+
+- Chamada (o token da Apify está salvo no ambiente e o proxy o injeta; não enviar cabeçalho de autorização):
+  ```
+  POST https://api.apify.com/v2/acts/abotapi~wine-searcher-scraper/run-sync-get-dataset-items?timeout=120
+  Content-Type: application/json
+  {"inputType":"auto","wineNames":["<produtor> <vinho> <safra>"],"fetchOffers":false,"fetchReviews":false,"targetCurrency":"USD","maxItems":20,"proxy":{"useApifyProxy":true}}
+  ```
+  Usar o nome sem parênteses; para linhas, o nome da linha + uva (ex.: "San Pedro 1865 Selected Vineyards Carmenere 2021").
+- Resposta por vinho: `wineName, vintage, criticScores {crítico: nota}, score (agregado), criticReviewsCount, avgPrice (USD),
+  labelImageUrl, wineSearcherUrl`. Se `wineName` começar com "Best local price", não houve página: tratar como não encontrado.
+- Mapa para `ficha.notas`: James Suckling→suckling; Robert Parker / Wine Advocate→parker; Wine Spectator→spectator;
+  Decanter e Decanter World Wine Awards→decanter; Vinous→vinous; Tim Atkin→atkin; Patricio Tapia - Descorchados→descorchados;
+  Wine Enthusiast→enthusiast; Revista Adega→adega; CellarTracker→cellartracker. Falstaff e outros só em `fontes`.
+- Gravar `ficha.wineSearcherUrl` (o app mostra o botão "Ver na Wine-Searcher").
+- Limite do método: Suckling, Parker e Vinous ficam ocultos na Wine-Searcher (só assinantes), então o `criticReviewsCount`
+  costuma ser maior que o nº de notas visíveis. Esses três continuam vindo da busca na web ou das capturas do Rafael.
+- Fonte na ficha: "Wine-Searcher via Apify (safra X, data): crítico nota, …; agregado N de M críticos; preço médio US$ P".
+
 ## Orçamento de tokens (decisão de 20/11/2026)
 
 A primeira versão usava três subagentes em paralelo por vinho (cerca de 350 mil tokens por garrafa). Agora:
 
-- **Um único subagente por vinho**, modelo Sonnet (`model: "sonnet"`), no máximo 12 buscas e 4 aberturas de página.
+- **Um único subagente por vinho**, modelo Sonnet (`model: "sonnet"`), no máximo 8 buscas e 4 aberturas de página
+  (reduzido de 12 em 24/11, porque a Apify já cobre a maior parte dos críticos e o preço de referência).
   A sessão principal só consolida e grava.
 - **Sites que bloqueiam** (nunca abrir; usar o trecho da busca e marcar "via busca, não conferido"): Wine Enthusiast,
   James Suckling, Wine Advocate, Decanter (nota em paywall), Wine Spectator, CellarTracker, Wine-Searcher, Wine.com,

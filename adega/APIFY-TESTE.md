@@ -34,3 +34,14 @@ Content-Type: application/json
    James Suckling→suckling, Robert Parker/Wine Advocate→parker, Wine Spectator→spectator, Decanter→decanter,
    Vinous→vinous, Tim Atkin→atkin, Descorchados→descorchados.
 4. Se cobrir mal: manter como está e registrar aqui o resultado.
+
+## Resultado do teste (24/11/2026)
+
+- 16 nomes enviados, 16 itens em 28 s, custo US$ 0,0451. 14 com página; 2 sem página (Gran Enemigo Chacayes 2021 e
+  Guadalmare Chianti Riserva 2021, que voltaram como "Best local price…").
+- 10 com notas por crítico. Críticos que aparecem: Wine Enthusiast, Wine Spectator, Tim Atkin, Descorchados, Decanter
+  World Wine Awards, Falstaff, Revista Adega, CellarTracker. Suckling, Parker e Vinous nunca aparecem (ocultos no site).
+- Novidades gravadas nas fichas: Sideral (Atkin 93, WE 91, DWWA 88, CT 91), Fin del Mundo (Atkin 90, Descorchados 92),
+  Rutini (DWWA 91, CT 90), Mimi (WE 89, DWWA 90), Cecchi (Adega 93), Meiomi (CT 87), Gattinara (WE 91, Atkin 91,
+  Adega 95, CT 90), Faustino I 2021 (DWWA 95).
+- Decisão: adotado como fonte primária (ver PROTOCOLO.md). App ganhou as colunas WE e Adega e o botão "Ver na Wine-Searcher".

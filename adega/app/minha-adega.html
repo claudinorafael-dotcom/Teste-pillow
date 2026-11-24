@@ -304,7 +304,7 @@ function janela(w){
 function hojeLocal(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" · "); }
 /* [key, short label for cards, long label for the detail sheet] */
-const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / Wine Advocate"],["spectator","WS","Wine Spectator"],["decanter","DEC","Decanter"],["vinous","VIN","Vinous / Galloni"],["atkin","TA","Tim Atkin"],["descorchados","DESC","Descorchados"],["vivino","Vivino","Vivino"],["cellartracker","CT","CellarTracker"]];
+const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / Wine Advocate"],["spectator","WS","Wine Spectator"],["decanter","DEC","Decanter"],["vinous","VIN","Vinous / Galloni"],["atkin","TA","Tim Atkin"],["descorchados","DESC","Descorchados"],["enthusiast","WE","Wine Enthusiast"],["adega","Adega","Revista Adega"],["vivino","Vivino","Vivino"],["cellartracker","CT","CellarTracker"]];
 const fmtNota = v => typeof v === "number" ? String(v).replace(".", ",") : String(v);
 function notasCurtas(w){
   const n = w.ficha && w.ficha.notas; if (!n) return "";
@@ -804,6 +804,7 @@ function openDetail(id){
     ${f.observacoes ? `<div class="note" style="margin-top:8px">⚠ ${esc(f.observacoes)}</div>` : ""}</div>
   <div class="sec"><h3>Notas</h3>${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
     ${f.fontes && f.fontes.length ? `<div class="note" style="margin-top:8px">Fontes: ${f.fontes.map(s => esc(s)).join("; ")}</div>` : ""}
+    ${f.wineSearcherUrl && /^https:\/\/www\.wine-searcher\.com\//.test(f.wineSearcherUrl) ? `<div style="margin-top:8px"><a class="btn small" href="${esc(f.wineSearcherUrl)}" target="_blank" rel="noopener">Ver na Wine-Searcher</a></div>` : ""}
     <div class="note" style="margin-top:8px">${f.verificadaEm ? `Notas verificadas em fontes externas em ${esc(f.verificadaEm.slice(0,10))}.` : `Confiança da ficha: ${esc(f.confianca||"?")}. Gerada ${f.atualizadoEm ? "em " + esc(f.atualizadoEm.slice(0,10)) : ""} a partir do conhecimento do Claude, sem consulta à internet.`}</div></div>` : ""}
   <div class="sec"><h3>Pesquisa de terceiros</h3>
     <div class="row" style="justify-content:space-between">
