@@ -45,3 +45,13 @@ Content-Type: application/json
   Rutini (DWWA 91, CT 90), Mimi (WE 89, DWWA 90), Cecchi (Adega 93), Meiomi (CT 87), Gattinara (WE 91, Atkin 91,
   Adega 95, CT 90), Faustino I 2021 (DWWA 95).
 - Decisão: adotado como fonte primária (ver PROTOCOLO.md). App ganhou as colunas WE e Adega e o botão "Ver na Wine-Searcher".
+
+## Segunda rodada (24/11/2026): 15 garrafas novas cadastradas entre 20 e 24/11
+
+- 15 itens em 6 s, custo US$ 0,05. 15 com página; 13 com notas por crítico (Masi Moxxé e Freixenet Asti sem notas).
+- Novidades gravadas: Bianchi IV Generación 2018 (WE 93, Atkin 90, Descorchados 94), Angélica Zapata 2020 (Adega 93, CT 91),
+  Casas del Bosque Riesling 2025 (Atkin 93, Adega 91), Caballo Loco 2023 (Atkin 94, DWWA 89) e 2021 (WE 93, Atkin 92,
+  Decanter 92, Descorchados 95), Marqués de Riscal 2020 (WE 92, WS 89, CT 92) e 2018 (CT 89), Epu 2022 (Atkin 93),
+  President's Blend 2020 (WE 91), Viña Monty 2016 (WS 91, Atkin 89, DWWA 95), Victoria Geisse (Descorchados 91),
+  Casas del Bosque Rosé 2025 (WE 90, Atkin 89, Adega 91), Borgogno Barbera 2017 (CT 89).
+- Outros críticos que só vão para `fontes`: Guía Peñín, Gismondi, Vinum, Hudin, Andreas Larsson, Catad'Or.
