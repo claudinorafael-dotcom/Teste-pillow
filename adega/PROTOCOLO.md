@@ -104,7 +104,9 @@ Responder no thread com o veredito em 3 a 5 linhas e resolver.
 ## Convenções
 
 - `pesquisa.status` (vinhos): `pendente` → `solicitada` (comentário enviado) → `feita`.
-- `status` (pesquisas): `pendente` → `solicitada` → `verificada`.
+- `status` (pesquisas): `pendente` → `solicitada` → `verificada`. "Remover da lista" no app só marca `arquivada: true`
+  (o documento continua no banco, para consulta futura); ao tratar pendências, ignorar documentos arquivados.
+- `adega/dados/vinhos.json` e `adega/dados/pesquisas.json`: cópias do banco feitas pela sessão principal de tempos em tempos.
 - Fotos tiradas no app já chegam reduzidas (≤1600 px); as que eu subo, ≤1200 px.
 
 ## Nota de qualidade (app, 24/11/2026)

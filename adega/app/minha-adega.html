@@ -642,23 +642,22 @@ async function pedirVerificacao(p){
 }
 function renderPesquisas(){
   const list = $("#qlist"); if (!list) return;
-  const arr = (state.pesquisas||[]).slice().sort((a,b) => (b.criadoEm||"").localeCompare(a.criadoEm||""));
+  const arr = (state.pesquisas||[]).filter(p => !p.arquivada).sort((a,b) => (b.criadoEm||"").localeCompare(a.criadoEm||""));
   if (!arr.length){ list.innerHTML = `<div class="empty">Nenhuma pesquisa ainda.</div>`; return; }
-  list.innerHTML = arr.map(p => { const v = p.verificada || p.rapida || {}; return `<div class="card" data-id="${esc(p.id)}" role="button" tabindex="0">
-      <div class="name">${esc([p.produtor,p.vinho].filter(Boolean).join(" · "))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></div>
-      <div class="right">${veredPill(v.veredito)}</div>
-      <div class="sub">R$ ${esc(p.precoPedido)}${p.loja ? " · " + esc(p.loja) : ""} · ${esc((p.criadoEm||"").slice(0,10))}${p.verificada ? " · verificado" : p.status === "solicitada" ? " · verificação pedida" : ""}</div>
-      <div class="right"><span class="note">${esc(v.precoJusto || (p.verificada && p.verificada.precoMercado) || "")}</span></div>
+  list.innerHTML = arr.map(p => { const v = p.verificada || {}; return `<div class="card" data-id="${esc(p.id)}" role="button" tabindex="0">
+      <div class="name" style="grid-column:1/-1">${esc(nomeCard(p))} <span style="color:var(--muted);font-weight:500">${esc(p.safra||"")}</span></div>
+      <div class="state">${v.veredito ? veredPill(v.veredito) : `<span class="pill hold">${p.status === "solicitada" ? "Pesquisando…" : "Pendente"}</span>`}<span class="win">R$ ${esc(p.precoPedido)}${p.loja ? " · " + esc(p.loja) : ""} · ${esc((p.criadoEm||"").slice(0,10))}</span></div>
+      ${v.titulo ? `<div class="sub" style="grid-column:1/-1">${esc(v.titulo)}</div>` : ""}
     </div>`; }).join("");
 }
 function openPesquisaDetail(id){
   const p = (state.pesquisas||[]).find(x => x.id === id); if (!p){ closeSheet(); return; }
   openSheet(`<div class="row" style="justify-content:flex-end"><button class="btn small" id="qd_close">Fechar</button></div><div id="qd_body"></div>
-    <div class="row" style="margin-top:8px"><button class="btn danger small" id="qd_del">Excluir pesquisa</button></div>`);
+    <div class="row" style="margin-top:8px"><button class="btn small" id="qd_del">Remover da lista</button><span class="note">O registro fica guardado; só sai desta tela.</span></div>`);
   $("#sheet").dataset.qid = id;
   renderResultado(p, $("#qd_body"));
   $("#qd_close").onclick = closeSheet;
-  $("#qd_del").onclick = async () => { try { await state.db.doc("pesquisas/"+id).delete(); closeSheet(); toast("Excluída."); } catch(e){ toast(dbErr(e)); } };
+  $("#qd_del").onclick = async () => { try { await state.db.doc("pesquisas/"+id).update({ arquivada:true, arquivadaEm:new Date().toISOString() }); closeSheet(); toast("Removida da lista. O registro continua guardado."); } catch(e){ toast(dbErr(e)); } };
 }
 function pedidoTexto(id, w){
   return `Pesquisar avaliações de terceiros, preço de mercado${w.fotoId ? "" : " e foto do rótulo"} para: ${nomeCompleto(w)} ${w.safra||""} (${[w.tipo,w.denominacao,w.regiao,w.pais].filter(Boolean).join(", ")}). Documento vinhos/${id}.`;

@@ -1,0 +1,99 @@
+[
+ {
+  "criadoEm": "2026-11-24T12:05:12.587Z",
+  "denominacao": "",
+  "fotoId": "",
+  "loja": "",
+  "motivo": "",
+  "pais": "Argentina",
+  "precoPedido": "140",
+  "produtor": "Bodega Catena Zapata (linha Saint Felicien)",
+  "rapida": null,
+  "regiao": "Mendoza",
+  "safra": "2022",
+  "status": "verificada",
+  "tipo": "Rosé",
+  "uvas": "Grenache, Syrah, Malbec",
+  "verificada": {
+   "alternativas": "Catena Malbec Rosé 2024 por R$ 173 no Pix na Fast Shop/Mistral (nov/2026): safra mais nova e mais fresca, porém mais simples e mais caro. Saint Felicien Rosé 2024 ou 2025, se aparecer, é a escolha para quem quer guardar.",
+   "fontes": [
+    "Apify/Wine-Searcher falhou duas vezes (ator não carregou páginas, erro de conexão, 24/11/2026); não usado",
+    "Vivino 4,2 com 254 avaliações (safra 2022, consultado 24/11/2026), vivino.com/BR/pt/saint-felicien-rose/w/6693137",
+    "James Suckling, Wine Advocate, Vinous, Tim Atkin, Descorchados, Wine Spectator, Decanter: nota não encontrada para o rótulo (busca na web, nov/2026)",
+    "Fast Shop/Mistral: Saint Felicien Rosé 2022 R$ 281,65, Pix R$ 259,12 na página aberta e R$ 207,86 no trecho da busca (nov/2026)",
+    "Fast Shop/Mistral: Catena Malbec Rosé 2024 R$ 216,42, Pix R$ 173,14 (nov/2026)",
+    "Uvas, vinificação, guarda de até 5 anos e serviço a 7 a 9 °C: ficha técnica da Fast Shop (safra 2022)"
+   ],
+   "janela": "2023 a 2027 (produtor sugere até 5 anos); ideal beber até meados de 2027",
+   "justificativa": "O Saint Felicien Rosé é o rosé da linha intermediária da Catena Zapata, corte de Grenache, Syrah e Malbec de Mendoza, com maceração curta de 6 horas, fermentação fria em inox por 23 dias e malolática parcial, o que dá mais corpo e textura que um rosé comum. A R$ 140 custa cerca de metade dos R$ 259 a 282 que a Mistral pede pela mesma safra 2022 na Fast Shop, e um terço abaixo até do Pix de R$ 208 visto na busca. A ressalva é a idade: é um rosé colhido em 2022, e o próprio produtor sugere guarda de até 5 anos, ou seja, até 2027; ele deve estar íntegro, mais frutado-maduro do que fresco, e precisa ser bebido nos próximos meses. Não há notas de crítico profissional para o rótulo (Suckling, Parker, Vinous, Atkin, Descorchados, Spectator e Decanter não avaliaram), mas o Vivino dá 4,2 em 254 avaliações para a safra 2022, bem acima da média para rosé. Compre se for consumir no verão; para guardar, prefira a safra 2024 ou 2025.",
+   "notas": {
+    "adega": null,
+    "atkin": null,
+    "cellartracker": null,
+    "decanter": null,
+    "descorchados": null,
+    "enthusiast": null,
+    "parker": null,
+    "spectator": null,
+    "suckling": null,
+    "vinous": null,
+    "vivino": 4.2
+   },
+   "precoJusto": "R$ 150 a 200 para um rosé Saint Felicien em safra atual; para a safra 2022, já com 4 anos, R$ 140 é teto razoável",
+   "precoMercado": "R$ 259 a 282 na Fast Shop, vendido pela Mistral (importadora oficial), safra 2022, nov/2026; o trecho da busca mostrava R$ 208 no Pix. Não encontrado em Evino, Wine.com.br, Grand Cru, World Wine, Oba nem Pão de Açúcar.",
+   "titulo": "Vale pelo preço, metade da Mistral, mas é rosé de 2022: para beber já, não para guardar",
+   "veredito": "vale",
+   "verificadaEm": "2026-11-24T12:20:00Z"
+  },
+  "via": "tarefa",
+  "vinho": "Saint Felicien Rosé",
+  "_id": "4tq8u6n5015hvj226dju"
+ },
+ {
+  "criadoEm": "2026-11-20T15:21:16.203Z",
+  "denominacao": "Margaux AOC",
+  "fotoId": "",
+  "loja": "OBA",
+  "pais": "França",
+  "precoPedido": "299,00",
+  "produtor": "Château du Tertre",
+  "regiao": "Margaux, Médoc",
+  "safra": "2021",
+  "status": "verificada",
+  "threadId": "69fdd962-be2d-4b75-a0c1-4bf58d8897f8",
+  "tipo": "Tinto",
+  "uvas": "Cabernet Sauvignon, Merlot, Cabernet Franc, Petit Verdot",
+  "verificada": {
+   "alternativas": "Pelo mesmo dinheiro, o Sideral 2022 (Grand Cru, R$ 230) tem notas mais altas, mas é outro estilo. Em Bordeaux na mesma faixa, Château Bernadotte 2011 (Mistral, R$ 367) é safra madura mas menos elegante. Se o objetivo é Margaux, este é o melhor negócio disponível agora.",
+   "fontes": [
+    "James Suckling 90-91 (2021, en primeur) e 91 em lojas",
+    "Decanter 89 (2021, abr/2022)",
+    "Vinous, Neal Martin 87-89 (2021)",
+    "Wine Spectator 87 (2021)",
+    "Jeb Dunnuck 90 para o grand vin Château du Tertre 2021",
+    "Oba Hortifruti: R$ 299 (de R$ 599), nov/2026",
+    "World Wine: Château du Tertre (grand vin) R$ 1.190"
+   ],
+   "janela": "2025 a 2031",
+   "justificativa": "Les Hauts du Tertre é o segundo vinho do Château du Tertre, 5º cru classificado de Margaux, feito com as parcelas mais jovens da propriedade. A R$ 299 está pela metade do preço de tabela do Oba e bem abaixo do que um Margaux de château classificado custa no Brasil. A safra 2021 foi fria e difícil em Bordeaux: as notas são corretas, não brilhantes (Suckling 90 a 91, Decanter 89, Vinous 87 a 89, Spectator 87), e o vinho é mais leve e fresco que 2019 ou 2020, para beber entre 2025 e 2031. Vale como porta de entrada em Margaux de verdade por preço de vinho genérico; não espere a concentração de uma safra grande.",
+   "notas": {
+    "atkin": null,
+    "cellartracker": null,
+    "decanter": 89,
+    "descorchados": null,
+    "parker": null,
+    "spectator": 87,
+    "suckling": 91,
+    "vinous": 88,
+    "vivino": null
+   },
+   "precoJusto": "R$ 450 a 600 no Brasil para este rótulo",
+   "precoMercado": "R$ 299 no Oba (de R$ 599, nov/2026); não está em Mistral, Grand Cru nem World Wine. Exterior: US$ 30 a 50. O grand vin Château du Tertre sai por R$ 1.190 na World Wine.",
+   "titulo": "Vale: metade do preço normal para o segundo vinho de um 5º cru classificado de Margaux",
+   "veredito": "vale",
+   "verificadaEm": "2026-11-20T15:25:00Z"
+  },
+  "vinho": "Les Hauts du Tertre",
+  "_id": "dduml0fd5e2z0duqiz63"
+ }
+]
