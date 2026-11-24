@@ -101,3 +101,14 @@ Responder no thread com o veredito em 3 a 5 linhas e resolver.
 - `pesquisa.status` (vinhos): `pendente` → `solicitada` (comentário enviado) → `feita`.
 - `status` (pesquisas): `pendente` → `solicitada` → `verificada`.
 - Fotos tiradas no app já chegam reduzidas (≤1600 px); as que eu subo, ≤1200 px.
+
+## Nota de qualidade (app, 24/11/2026)
+
+Calculada na hora pelo app a partir de `ficha.notas`, não gravada no banco:
+- média dos críticos em escala 100 (suckling, parker, spectator, decanter, vinous, atkin, descorchados, enthusiast, adega)
+  puxada para 89 por uma nota fictícia: (soma + 89) / (n + 1), para uma nota isolada não valer como três;
+- comunidade: Vivino convertido (88 + (nota − 4) × 15; 4,0→88, 4,5→95) e CellarTracker como está, na média;
+- qualidade = 70% críticos + 30% comunidade (só o que existir);
+- faixas: ≥95 Excepcional, ≥92 Excelente, ≥89 Muito bom, ≥86 Bom, abaixo Simples;
+- confiança: alta com 3+ críticos, média com 1 ou 2, baixa só com comunidade.
+Aparece como chip "Q" no card, na seção Notas da ficha e na ordenação "qualidade (notas)".

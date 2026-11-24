@@ -131,6 +131,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 .photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .photos img{max-width:100%;max-height:260px;border-radius:var(--r);background:var(--surface2)}
 .notas{display:flex;gap:6px;flex-wrap:wrap;min-width:0;align-items:center}
+.nt.q{background:var(--accent-soft);color:var(--accent)}
 .nt{font-size:12px;background:var(--surface2);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .nt b{color:var(--accent);font-weight:700;margin-right:2px}
 .nt.none{color:var(--muted);background:transparent;padding-left:0}
@@ -207,6 +208,7 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
       <option value="nome">Ordenar: nome</option>
       <option value="safra">Ordenar: safra</option>
       <option value="recentes">Ordenar: adicionados recentemente</option>
+      <option value="qualidade">Ordenar: qualidade (notas)</option>
       <option value="precoDesc">Ordenar: preço, maior primeiro</option>
       <option value="precoAsc">Ordenar: preço, menor primeiro</option>
     </select>
@@ -315,6 +317,23 @@ function precoNum(w){
   const n = (t, reais) => { if (!t) return null; const m = String(t).replace(/\.(?=\d{3})/g, "").replace(",", ".").match(reais ? /R\$\s?(\d+(?:\.\d+)?)/ : /\d+(?:\.\d+)?/); return m ? Number(reais ? m[1] : m[0]) : null; };
   return n(w.preco, false) ?? n(w.ficha && w.ficha.precoEstimado, true);
 }
+/* Quality score (0-100): critics' mean shrunk toward 89 by one pseudo-score (a single 95 is not worth three),
+   70% critics + 30% community (Vivino 1-5 mapped: 4,0→88, 4,5→95; CellarTracker as is). Confidence by critic count. */
+const QUAL_CRIT = ["suckling","parker","spectator","decanter","vinous","atkin","descorchados","enthusiast","adega"];
+function qualidade(w){
+  const n = w.ficha && w.ficha.notas || {};
+  const num = (v) => v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v);
+  const crit = QUAL_CRIT.map(k => num(n[k])).filter(v => v !== null);
+  const com = [];
+  const vv = num(n.vivino); if (vv !== null) com.push(88 + (vv - 4) * 15);
+  const ct = num(n.cellartracker); if (ct !== null) com.push(ct);
+  if (!crit.length && !com.length) return null;
+  const c = crit.length ? (crit.reduce((a,b) => a+b, 0) + 89) / (crit.length + 1) : null;
+  const m = com.length ? com.reduce((a,b) => a+b, 0) / com.length : null;
+  const sc = c !== null && m !== null ? 0.7*c + 0.3*m : (c !== null ? c : m);
+  const faixa = sc >= 95 ? "Excepcional" : sc >= 92 ? "Excelente" : sc >= 89 ? "Muito bom" : sc >= 86 ? "Bom" : "Simples";
+  return { s: Math.round(sc*10)/10, faixa, conf: crit.length >= 3 ? "alta" : crit.length ? "média" : "baixa", nc: crit.length, nm: com.length };
+}
 function tipoClass(t){ return ({ "Rosé":"t-rose", "Branco":"t-branco", "Espumante":"t-esp", "Doce":"t-doce", "Fortificado":"t-doce" })[t] || ""; }
 function nomeCard(w){ const c = (t) => String(t||"").replace(/\s*\([^)]*\)/g, "").trim(); return [c(w.produtor), c(w.vinho)].filter(Boolean).join(" · "); }
 function precoCurto(w){
@@ -341,6 +360,7 @@ function filtered(){
     if (state.sort === "nome") return nomeCompleto(x).localeCompare(nomeCompleto(y));
     if (state.sort === "safra") return (Number(x.safra)||0) - (Number(y.safra)||0);
     if (state.sort === "recentes") return (y.criadoEm||"").localeCompare(x.criadoEm||"");
+    if (state.sort === "qualidade"){ const qx = qualidade(x), qy = qualidade(y); if (!qx && !qy) return 0; if (!qx) return 1; if (!qy) return -1; return (qy.s - qx.s) || (qy.nc - qx.nc); }
     if (state.sort === "precoDesc" || state.sort === "precoAsc"){ const px = precoNum(x), py = precoNum(y); if (px === null && py === null) return 0; if (px === null) return 1; if (py === null) return -1; return state.sort === "precoDesc" ? py - px : px - py; }
     const jx = janela(x), jy = janela(y);
     if (rank[jx.k] !== rank[jy.k]) return rank[jx.k] - rank[jy.k];
@@ -377,7 +397,7 @@ function renderList(){
       <div class="state"><span class="pill ${j.k}">${esc(j.label)}</span>${j.a||j.b ? `<span class="win">janela ${j.a||"?"} a ${j.b||"?"}</span>` : ""}</div>
       <div class="sub">${esc(sub)}</div>
       <div class="right"><span class="pill tipo ${tipoClass(w.tipo)}">${esc(w.tipo||"")}</span></div>
-      <div class="foot"><div class="notas">${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div><div class="pre">${precoCurto(w)}</div></div>
+      <div class="foot"><div class="notas">${(() => { const q = qualidade(w); return q ? `<span class="nt q" title="qualidade ${q.s}, ${q.faixa}, confiança ${q.conf}"><b>Q</b> ${esc(q.s.toFixed(1))}</span>` : ""; })()}${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div><div class="pre">${precoCurto(w)}</div></div>
     </div>`;
   }).join("");
 }
@@ -802,7 +822,7 @@ function openDetail(id){
   ${f ? `<div class="sec"><h3>Harmonização</h3><div>${esc(f.harmonizacao||"")}</div></div>
   <div class="sec"><h3>Sobre o vinho</h3><div class="pre">${esc(f.resumo||"")}${f.estilo ? "\n\n" + esc(f.estilo) : ""}${f.vinificacao ? "\n\n" + esc(f.vinificacao) : ""}</div>
     ${f.observacoes ? `<div class="note" style="margin-top:8px">⚠ ${esc(f.observacoes)}</div>` : ""}</div>
-  <div class="sec"><h3>Notas</h3>${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
+  <div class="sec"><h3>Notas</h3>${(() => { const q = qualidade(w); return q ? `<div class="note" style="margin-bottom:8px"><b>Qualidade ${esc(q.s.toFixed(1))} · ${esc(q.faixa)}</b> (${q.nc} crítico${q.nc===1?"":"s"}, ${q.nm} fonte${q.nm===1?"":"s"} de comunidade; confiança ${esc(q.conf)}). Média dos críticos puxada para 89 por uma nota fictícia, 70% críticos e 30% comunidade.</div>` : ""; })()}${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
     ${f.fontes && f.fontes.length ? `<div class="note" style="margin-top:8px">Fontes: ${f.fontes.map(s => esc(s)).join("; ")}</div>` : ""}
     ${f.wineSearcherUrl && /^https:\/\/www\.wine-searcher\.com\//.test(f.wineSearcherUrl) ? `<div style="margin-top:8px"><a class="btn small" href="${esc(f.wineSearcherUrl)}" target="_blank" rel="noopener">Ver na Wine-Searcher</a></div>` : ""}
     <div class="note" style="margin-top:8px">${f.verificadaEm ? `Notas verificadas em fontes externas em ${esc(f.verificadaEm.slice(0,10))}.` : `Confiança da ficha: ${esc(f.confianca||"?")}. Gerada ${f.atualizadoEm ? "em " + esc(f.atualizadoEm.slice(0,10)) : ""} a partir do conhecimento do Claude, sem consulta à internet.`}</div></div>` : ""}
