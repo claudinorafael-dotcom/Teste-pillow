@@ -37,6 +37,11 @@ Testado com os 16 rótulos: 16 itens em 30 s, 14 com página, 10 com notas por c
   Decanter e Decanter World Wine Awards→decanter; Vinous→vinous; Tim Atkin→atkin; Patricio Tapia - Descorchados→descorchados;
   Wine Enthusiast→enthusiast; Revista Adega→adega; CellarTracker→cellartracker. Falstaff e outros só em `fontes`.
 - Gravar `ficha.wineSearcherUrl` (o app mostra o botão "Ver na Wine-Searcher").
+- Falha vista em 24/11 (12h05): o ator terminou com "Could not load any results page / time budget for opening a session
+  exhausted", ou seja, a Wine-Searcher recusou os IPs de datacenter da Apify por alguns minutos. Regra: esperar 60 s e repetir
+  uma vez com `"proxy":{"useApifyProxy":true,"apifyProxyGroups":["RESIDENTIAL"]}`; se falhar de novo, seguir sem a Apify e
+  anotar em `fontes`. Enviar só os campos listados acima (a sessão daquele dia copiou "urls"/"lwins" de exemplo do ator).
+  Para o Saint Felicien Rosé 2022 o resultado real era "sem página", então nada foi perdido.
 - Limite do método: Suckling, Parker e Vinous ficam ocultos na Wine-Searcher (só assinantes), então o `criticReviewsCount`
   costuma ser maior que o nº de notas visíveis. Esses três continuam vindo da busca na web ou das capturas do Rafael.
 - Fonte na ficha: "Wine-Searcher via Apify (safra X, data): crítico nota, …; agregado N de M críticos; preço médio US$ P".
