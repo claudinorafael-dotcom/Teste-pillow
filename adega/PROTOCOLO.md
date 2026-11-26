@@ -56,6 +56,12 @@ A primeira versão usava três subagentes em paralelo por vinho (cerca de 350 mi
 - **Sites que bloqueiam** (nunca abrir; usar o trecho da busca e marcar "via busca, não conferido"): Wine Enthusiast,
   James Suckling, Wine Advocate, Decanter (nota em paywall), Wine Spectator, CellarTracker, Wine-Searcher, Wine.com,
   Mercado Livre, Mistral, Grand Cru, World Wine. Descorchados, Pão de Açúcar, Evino: abrir.
+- **Vivino, limites** (26/11): depois de muitas aberturas num dia, as páginas passam a responder 403 para todos. Nesse caso
+  usar a média do rótulo que aparece no trecho da busca, marcada "média do rótulo, via busca, não conferido". O raspador de
+  Vivino da Apify (mrbridge) foi bloqueado pelo classificador de segurança da sessão; não insistir nele.
+- **Limite de uso da conta** (26/11): a tarefa sob demanda falhou com USAGE_LIMIT_REACHED e 8 garrafas ficaram sem ficha; a
+  sessão principal fez a pesquisa em modo reduzido (Apify + busca, sem subagente). Quando o limite voltar, as próximas
+  garrafas seguem o fluxo normal. Conferir `last_run` da tarefa quando houver pendências antigas.
 - **Vivino, o que funciona** (aprendido em 20/11 com o Cecchi e o 1865): a busca de texto do site não carrega. Em vez disso,
   (1) WebSearch restrito a `vivino.com` com o nome do vinho para achar a URL `…/w/<número>`; (2) WebFetch dessa URL com
   `?year=<safra>`: a página abre e mostra nota média da safra e nº de avaliações. Nunca gravar "não encontrado no Vivino"
