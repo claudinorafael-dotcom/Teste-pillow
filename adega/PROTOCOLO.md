@@ -46,6 +46,24 @@ Testado com os 16 rótulos: 16 itens em 30 s, 14 com página, 10 com notas por c
   costuma ser maior que o nº de notas visíveis. Esses três continuam vindo da busca na web ou das capturas do Rafael.
 - Fonte na ficha: "Wine-Searcher via Apify (safra X, data): crítico nota, …; agregado N de M críticos; preço médio US$ P".
 
+## Custo por garrafa, versão 26/11/2026
+
+Medição antes: 70 a 100 mil tokens por garrafa (sessão nova por garrafa, listagem do banco inteiro, subagente Sonnet com
+8 buscas e aberturas de página). Mudanças aplicadas, mantendo o subagente de busca que o Rafael valoriza:
+
+1. **Um lote por sessão**: o app dispara a tarefa no máximo uma vez a cada 10 min (`adega_fire_last` no aparelho); dentro
+   da janela agenda um disparo adiado; ao abrir, se houver pendência com mais de 15 min, dispara uma vez. A sessão trata tudo.
+2. **Marcador `pendente: true`** (campo de primeiro nível) em `vinhos` e `pesquisas` ao criar; a sessão consulta só
+   `where pendente == true` e grava `pendente: false` ao terminar. Sem listar o banco inteiro.
+3. **Ficha reaproveitada**: garrafa igual (produtor, vinho e safra normalizados) já pesquisada → o app copia a ficha e não
+   pede pesquisa (`pesquisa.via: "copia"`).
+4. **Subagente mais barato**: um agente por lote (até 8 vinhos), modelo Haiku, no máximo 4 buscas por vinho e nenhuma
+   abertura de página, só para o que a Apify não traz (Suckling, Parker, Vinous, Vivino pelo trecho, preço no Brasil),
+   resposta em JSON. Pula Suckling/Parker quando a Apify já trouxe.
+5. **Vivino só pelo trecho da busca**: as páginas passaram a responder 403 depois do volume de 26/11.
+
+Meta: 15 a 25 mil tokens por garrafa.
+
 ## Orçamento de tokens (decisão de 20/11/2026)
 
 A primeira versão usava três subagentes em paralelo por vinho (cerca de 350 mil tokens por garrafa). Agora:

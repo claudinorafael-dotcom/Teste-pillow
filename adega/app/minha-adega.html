@@ -530,6 +530,9 @@ function restoreDraft(){
   else { if (!state.db) return; openForm(null, true); apply($("#fotoStatus")); }
   toast("Recuperei o cadastro que estava em andamento.");
 }
+/* An already-researched bottle of the same wine and vintage (names compared without accents, case or punctuation). */
+function chave(w){ return [w.produtor, w.vinho, w.safra].map(x => String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\([^)]*\)/g, "").replace(/[^a-z0-9]+/g, " ").trim()).join("|"); }
+function gemea(d){ const k = chave(d); return state.wines.find(x => x.ficha && x.ficha.verificadaEm && chave(x) === k) || null; }
 function openForm(w, keepFoto){
   if (!keepFoto) state.pendingFoto = null;
   openSheet(formHtml(w || {}));
@@ -553,10 +556,19 @@ function openForm(w, keepFoto){
         await state.db.doc("vinhos/"+w.id).update(d);
         toast("Salvo."); openDetail(w.id);
       } else {
-        d.criadoEm = new Date().toISOString(); d.ficha = null; d.pesquisa = { status:"pendente", pedidoEm:new Date().toISOString() };
-        const ref = await state.db.collection("vinhos").add(d);
-        clearDraft(); closeSheet(); toast("Adicionada. Pedindo a ficha ao Claude…");
-        pedirPesquisa(ref.id, d);
+        d.criadoEm = new Date().toISOString();
+        const igual = gemea(d);
+        if (igual){
+          d.ficha = { ...igual.ficha, observacoes: [(igual.ficha.observacoes||""), `Ficha copiada da garrafa igual cadastrada em ${(igual.criadoEm||"").slice(0,10)}.`].filter(Boolean).join(" ") };
+          d.pesquisa = { status:"feita", feitaEm:new Date().toISOString(), via:"copia", de:igual.id }; d.pendente = false;
+          await state.db.collection("vinhos").add(d);
+          clearDraft(); closeSheet(); toast("Adicionada. Ficha copiada de uma garrafa igual, sem nova pesquisa.");
+        } else {
+          d.ficha = null; d.pesquisa = { status:"pendente", pedidoEm:new Date().toISOString() }; d.pendente = true;
+          const ref = await state.db.collection("vinhos").add(d);
+          clearDraft(); closeSheet(); toast("Adicionada. Pedindo a ficha ao Claude…");
+          pedirPesquisa(ref.id, d);
+        }
       }
     } catch(err){ toast(dbErr(err)); $("#btnSave").disabled = false; }
   };
@@ -588,7 +600,7 @@ async function avaliarCompra(){
   $("#q_ok").disabled = true; $("#q_status").innerHTML = `<span class="spin"></span>Enviando…`;
   $("#q_result").innerHTML = "";
   try {
-    const doc = { ...q, fotoId: state.pendingFotoQ || "", rapida: null, verificada: null, status:"pendente", criadoEm:new Date().toISOString() };
+    const doc = { ...q, fotoId: state.pendingFotoQ || "", rapida: null, verificada: null, status:"pendente", pendente: true, criadoEm:new Date().toISOString() };
     const ref = await state.db.collection("pesquisas").add(doc);
     clearDraft(); state.pendingFotoQ = null;
     const p = { ...doc, id: ref.id };
@@ -681,9 +693,20 @@ async function viaComentario(anchorEl, text){
     return { ok:false, why:"falha ao comentar" };
   }
 }
+/* The task handles everything pending, so firing it once per batch is enough: at most one fire every 10 minutes;
+   a request inside that window schedules a deferred fire (while the page stays open) instead of a new session. */
+const FIRE_GAP = 10 * 60e3;
+let fireTimer = null;
 async function viaTarefa(text){
   if (!state.mcp) return { ok:false, why:"conector Claude Code Remote indisponível" };
+  let last = 0; try { last = Number(localStorage.getItem("adega_fire_last")) || 0; } catch {}
+  const wait = FIRE_GAP - (Date.now() - last);
+  if (wait > 0){
+    if (!fireTimer) fireTimer = setTimeout(() => { fireTimer = null; viaTarefa("Pendências acumuladas no app."); }, wait + 2000);
+    return { ok:true, deferred:true };
+  }
   try {
+    try { localStorage.setItem("adega_fire_last", String(Date.now())); } catch {}
     await state.mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: TRIGGER_ID, text });
     return { ok:true };
   } catch(e){
@@ -1069,6 +1092,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Escape") return; cons
     if (!(snap.metadata && snap.metadata.fromCache)){ clearTimeout(timer); $("#status").textContent = "Sincronizado"; }
     renderAll();
     const sh = $("#sheet"); if (sh && sh.dataset.id && !$("#wform") && !$("#cform")) openDetail(sh.dataset.id);
+    if (!state.checkedPending){ state.checkedPending = true; const old = state.wines.filter(w => w.pesquisa && ["pendente","solicitada"].includes(w.pesquisa.status) && Date.now() - Date.parse(w.pesquisa.pedidoEm||0) > 15*60e3); if (old.length && state.mcp) setTimeout(() => viaTarefa(`Pendências antigas no app: ${old.length} garrafa(s).`), 3000); }
   }, err => { clearTimeout(timer); $("#status").textContent = "Não foi possível carregar a adega."; state.loaded = true; renderAll(); });
   db.collection("pesquisas").onSnapshot(snap => {
     state.pesquisas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
