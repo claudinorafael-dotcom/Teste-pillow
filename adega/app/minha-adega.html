@@ -311,7 +311,7 @@ const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / 
 const fmtNota = v => typeof v === "number" ? String(v).replace(".", ",") : String(v);
 function notasCurtas(w){
   const n = w.ficha && w.ficha.notas; if (!n) return "";
-  return SCORE_KEYS.filter(([k]) => n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("");
+  return SCORE_KEYS.filter(([k]) => k !== "cellartracker" && n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("");
 }
 /* price as a number: paid price first, else the first figure of the market estimate; null when unknown */
 function precoNum(w){
@@ -319,19 +319,19 @@ function precoNum(w){
   return n(w.preco, false) ?? n(w.ficha && w.ficha.precoEstimado, true);
 }
 /* Quality score (0-100): critics' mean shrunk toward 89 by one pseudo-score (a single 95 is not worth three),
-   70% critics + 30% community (Vivino 1-5 mapped: 4,0→88, 4,5→95; CellarTracker as is). Confidence by critic count. */
+   70% critics + 30% community. Community = Vivino only (1-5 mapped: 4,0→88, 4,5→95); CellarTracker is not used.
+   No critics at all: the Vivino figure is pulled halfway to 88, so a community-only wine never outranks reviewed ones. */
 const QUAL_CRIT = ["suckling","parker","spectator","decanter","vinous","atkin","descorchados","enthusiast","adega"];
 function qualidade(w){
   const n = w.ficha && w.ficha.notas || {};
   const num = (v) => v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v);
   const crit = QUAL_CRIT.map(k => num(n[k])).filter(v => v !== null);
-  const com = [];
-  const vv = num(n.vivino); if (vv !== null) com.push(88 + (vv - 4) * 15);
-  const ct = num(n.cellartracker); if (ct !== null) com.push(ct);
+  const vv = num(n.vivino);
+  const com = vv !== null ? [88 + (vv - 4) * 15] : [];
   if (!crit.length && !com.length) return null;
   const c = crit.length ? (crit.reduce((a,b) => a+b, 0) + 89) / (crit.length + 1) : null;
-  const m = com.length ? com.reduce((a,b) => a+b, 0) / com.length : null;
-  const sc = c !== null && m !== null ? 0.7*c + 0.3*m : (c !== null ? c : m);
+  const m = com.length ? com[0] : null;
+  const sc = c !== null && m !== null ? 0.7*c + 0.3*m : (c !== null ? c : (m + 88) / 2);
   const faixa = sc >= 95 ? "Excepcional" : sc >= 92 ? "Excelente" : sc >= 89 ? "Muito bom" : sc >= 86 ? "Bom" : "Simples";
   return { s: Math.round(sc*10)/10, faixa, conf: crit.length >= 3 ? "alta" : crit.length ? "média" : "baixa", nc: crit.length, nm: com.length };
 }
@@ -847,7 +847,7 @@ function openDetail(id){
   ${f ? `<div class="sec"><h3>Harmonização</h3><div>${esc(f.harmonizacao||"")}</div></div>
   <div class="sec"><h3>Sobre o vinho</h3><div class="pre">${esc(f.resumo||"")}${f.estilo ? "\n\n" + esc(f.estilo) : ""}${f.vinificacao ? "\n\n" + esc(f.vinificacao) : ""}</div>
     ${f.observacoes ? `<div class="note" style="margin-top:8px">⚠ ${esc(f.observacoes)}</div>` : ""}</div>
-  <div class="sec"><h3>Notas</h3>${(() => { const q = qualidade(w); return q ? `<div class="note" style="margin-bottom:8px"><b>Qualidade ${esc(q.s.toFixed(1))} · ${esc(q.faixa)}</b> (${q.nc} crítico${q.nc===1?"":"s"}, ${q.nm} fonte${q.nm===1?"":"s"} de comunidade; confiança ${esc(q.conf)}). Média dos críticos puxada para 89 por uma nota fictícia, 70% críticos e 30% comunidade.</div>` : ""; })()}${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
+  <div class="sec"><h3>Notas</h3>${(() => { const q = qualidade(w); return q ? `<div class="note" style="margin-bottom:8px"><b>Qualidade ${esc(q.s.toFixed(1))} · ${esc(q.faixa)}</b> (${q.nc} crítico${q.nc===1?"":"s"}${q.nm ? " e Vivino" : ""}; confiança ${esc(q.conf)}). Média dos críticos puxada para 89 por uma nota fictícia, 70% críticos e 30% Vivino; sem críticos, o Vivino é puxado para a média.</div>` : ""; })()}${scores ? `<div class="scores">${scores}</div>` : `<div class="note">Sem notas confiáveis registradas.</div>`}
     ${f.fontes && f.fontes.length ? `<div class="note" style="margin-top:8px">Fontes: ${f.fontes.map(s => esc(s)).join("; ")}</div>` : ""}
     ${f.wineSearcherUrl && /^https:\/\/www\.wine-searcher\.com\//.test(f.wineSearcherUrl) ? `<div style="margin-top:8px"><a class="btn small" href="${esc(f.wineSearcherUrl)}" target="_blank" rel="noopener">Ver na Wine-Searcher</a></div>` : ""}
     <div class="note" style="margin-top:8px">${f.verificadaEm ? `Notas verificadas em fontes externas em ${esc(f.verificadaEm.slice(0,10))}.` : `Confiança da ficha: ${esc(f.confianca||"?")}. Gerada ${f.atualizadoEm ? "em " + esc(f.atualizadoEm.slice(0,10)) : ""} a partir do conhecimento do Claude, sem consulta à internet.`}</div></div>` : ""}

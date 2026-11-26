@@ -138,8 +138,10 @@ Responder no thread com o veredito em 3 a 5 linhas e resolver.
 Calculada na hora pelo app a partir de `ficha.notas`, não gravada no banco:
 - média dos críticos em escala 100 (suckling, parker, spectator, decanter, vinous, atkin, descorchados, enthusiast, adega)
   puxada para 89 por uma nota fictícia: (soma + 89) / (n + 1), para uma nota isolada não valer como três;
-- comunidade: Vivino convertido (88 + (nota − 4) × 15; 4,0→88, 4,5→95) e CellarTracker como está, na média;
-- qualidade = 70% críticos + 30% comunidade (só o que existir);
+- comunidade: só o Vivino, convertido (88 + (nota − 4) × 15; 4,0→88, 4,5→95). Decisão do Rafael em 26/11: o Vivino já é
+  a grande comunidade; CellarTracker saiu da conta e dos chips do card (continua na ficha quando a Apify trouxer);
+- qualidade = 70% críticos + 30% Vivino; só críticos quando não há Vivino; sem nenhum crítico, o Vivino convertido é
+  puxado pela metade para 88, para que vinho só com nota de comunidade não passe na frente dos avaliados;
 - faixas: ≥95 Excepcional, ≥92 Excelente, ≥89 Muito bom, ≥86 Bom, abaixo Simples;
 - confiança: alta com 3+ críticos, média com 1 ou 2, baixa só com comunidade.
 Aparece como chip "Q" no card, na seção Notas da ficha e na ordenação "qualidade (notas)".
