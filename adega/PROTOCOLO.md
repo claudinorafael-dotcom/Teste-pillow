@@ -107,7 +107,9 @@ Gravar com `ArtifactData update` (pinar `if_version`) a ficha **completa** (o ce
 - `ficha.precoEstimado` ("R$ x a y (loja, mês/ano)"),
 - `ficha.janelaInicio/janelaFim/apice` (preferir janela de crítico) e `ficha.apiceInicio/apiceFim`: faixa de 3 anos em que
   o vinho deve estar no melhor (de um crítico quando houver; senão ápice ±1). O app mostra a faixa na barra e usa:
-  "Já dá, ápice a partir de X" (janela de 6+ anos, mais de 1 ano antes da faixa), "No ápice" (dentro da faixa),
+  "Já dá, ápice a partir de X" (janela de 6+ anos e ainda antes da faixa; desde 26/11 sem a folga de 1 ano, a pedido do
+  Rafael: quem ainda vai melhorar conta como Guardar), "No ápice" (dentro da faixa; com 7+ anos de janela pela frente o
+  card mostra "sem pressa, até X", porque o vinho se mantém mas não melhora),
   "Pronto, após o ápice" (depois da faixa). Uma faixa é mais honesta que um ano único, que seria precisão falsa.
 - `ficha.verificadaEm` (ISO), `pesquisa: {status:"feita", feitaEm}`.
 Se já houver ficha, não sobrescrever `resumo`, `harmonizacao`, `decantar` a menos que estejam errados.

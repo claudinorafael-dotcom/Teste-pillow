@@ -57,6 +57,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .card .state{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 .card .state .pill{white-space:normal;text-align:left}
 .card .state .win{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.card .state .win.calm{color:var(--ok);font-weight:600}
 .card .foot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 .card .foot .notas{flex:1 1 180px}
 .card .foot .pre{margin-left:auto}
@@ -278,7 +279,7 @@ async function shrinkImage(file, max = 1600){
    últimos 2 anos da janela ................... Beber logo
    depois da janela ........................... Passou do ponto
    dentro da janela, janela longa (6+ anos) e
-     mais de 1 ano antes da faixa de ápice .... Já dá, ápice a partir de X   (conta como Guardar)
+     antes da faixa de ápice .................. Já dá, ápice a partir de X   (conta como Guardar)
    dentro da faixa de ápice ................... No ápice               (conta como Pronto)
    depois da faixa, antes do fim .............. Pronto, após o ápice   (conta como Pronto)
    dentro da janela, demais casos ............. Pronto para beber
@@ -299,7 +300,7 @@ function janela(w){
   if (!(p1 && p2 && p2 >= p1) && ap){ p1 = ap - 1; p2 = ap + 1; }
   if (p1 && a) p1 = Math.max(p1, a); if (p2 && b) p2 = Math.min(p2, b);
   if (p1 && p2 && p1 > p2){ p1 = null; p2 = null; }
-  if (p1 && p2 && span >= 6 && YEAR < p1 - 1) return {k:"young", label:`Já dá, ápice a partir de ${p1}`, a, b, ap, p1, p2};
+  if (p1 && p2 && span >= 6 && YEAR < p1) return {k:"young", label:`Já dá, ápice a partir de ${p1}`, a, b, ap, p1, p2};
   if (p1 && p2 && YEAR >= p1 && YEAR <= p2) return {k:"ok", label:"No ápice", a, b, ap, p1, p2};
   if (p2 && YEAR > p2) return {k:"ok", label:"Pronto, após o ápice", a, b, ap, p1, p2};
   return {k:"ok", label:"Pronto para beber", a, b, ap, p1, p2};
@@ -397,7 +398,7 @@ function renderList(){
     return `<div class="card" data-id="${esc(w.id)}" role="button" tabindex="0">
       <div class="name">${w.fotoId ? `<img class="thumb" src="${esc(blobUrl(w.fotoId))}" alt="" loading="lazy" decoding="async">` : ""}${esc(nomeCard(w))} <span style="color:var(--muted);font-weight:500">${esc(w.safra||"")}</span></div>
       <div class="right"><span class="qty">${w.qtd|0} gf</span></div>
-      <div class="state"><span class="pill ${j.k}">${esc(j.label)}</span>${j.a||j.b ? `<span class="win">janela ${j.a||"?"} a ${j.b||"?"}</span>` : ""}</div>
+      <div class="state"><span class="pill ${j.k}">${esc(j.label)}</span>${j.a||j.b ? `<span class="win">janela ${j.a||"?"} a ${j.b||"?"}</span>` : ""}${j.k === "ok" && j.b && j.b - YEAR >= 7 ? `<span class="win calm">sem pressa, até ${j.b}</span>` : ""}</div>
       <div class="sub">${esc(sub)}</div>
       <div class="right"><span class="pill tipo ${tipoClass(w.tipo)}">${esc(w.tipo||"")}</span></div>
       <div class="foot"><div class="notas">${(() => { const q = qualidade(w); return q ? `<span class="nt q" title="qualidade ${q.s}, ${q.faixa}, confiança ${q.conf}"><b>Q</b> ${esc(q.s.toFixed(1))}</span>` : ""; })()}${notasCurtas(w) || `<span class="nt none">sem notas</span>`}</div><div class="pre">${precoCurto(w)}</div></div>
