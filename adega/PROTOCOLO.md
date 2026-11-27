@@ -46,6 +46,12 @@ Testado com os 16 rótulos: 16 itens em 30 s, 14 com página, 10 com notas por c
   costuma ser maior que o nº de notas visíveis. Esses três continuam vindo da busca na web ou das capturas do Rafael.
 - Fonte na ficha: "Wine-Searcher via Apify (safra X, data): crítico nota, …; agregado N de M críticos; preço médio US$ P".
 
+## Catálogo X-Wines (27/11/2026)
+
+Catálogo offline de 100 mil vinhos publicado com o app (detalhes em `adega/XWINES-TESTE.md`). Quando o documento tem o
+campo `xw`, o Rafael confirmou o vinho no catálogo: a nota de comunidade vem dele e a pesquisa NÃO busca o Vivino
+(`ficha.notas.vivino` fica null). Nunca alterar `xw`. Ao republicar a página, não remover os arquivos `xw/`.
+
 ## Custo por garrafa, versão 26/11/2026
 
 Medição antes: 70 a 100 mil tokens por garrafa (sessão nova por garrafa, listagem do banco inteiro, subagente Sonnet com

@@ -133,6 +133,11 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;letter-s
 .photos img{max-width:100%;max-height:260px;border-radius:var(--r);background:var(--surface2)}
 .notas{display:flex;gap:6px;flex-wrap:wrap;min-width:0;align-items:center}
 .nt.q{background:var(--accent-soft);color:var(--accent)}
+.xw{margin-bottom:10px}
+.xwc{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;cursor:pointer;color:var(--fg);font:inherit}
+.xwc b{display:block;font-size:14px} .xwc span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.xwc:hover{border-color:var(--accent)}
+.xwok{background:var(--ok-soft);color:var(--fg);border-radius:10px;padding:8px 10px;font-size:13px} .xwok span{color:var(--muted);font-size:12px}
 .nt{font-size:12px;background:var(--surface2);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .nt b{color:var(--accent);font-weight:700;margin-right:2px}
 .nt.none{color:var(--muted);background:transparent;padding-left:0}
@@ -311,8 +316,11 @@ function nomeCompleto(w){ return [w.produtor, w.vinho].filter(Boolean).join(" ·
 const SCORE_KEYS = [["suckling","JS","James Suckling"],["parker","RP","Parker / Wine Advocate"],["spectator","WS","Wine Spectator"],["decanter","DEC","Decanter"],["vinous","VIN","Vinous / Galloni"],["atkin","TA","Tim Atkin"],["descorchados","DESC","Descorchados"],["enthusiast","WE","Wine Enthusiast"],["adega","Adega","Revista Adega"],["vivino","Vivino","Vivino"],["cellartracker","CT","CellarTracker"]];
 const fmtNota = v => typeof v === "number" ? String(v).replace(".", ",") : String(v);
 function notasCurtas(w){
-  const n = w.ficha && w.ficha.notas; if (!n) return "";
-  return SCORE_KEYS.filter(([k]) => k !== "cellartracker" && n[k] !== null && n[k] !== undefined && n[k] !== "").map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`).join("");
+  const n = (w.ficha && w.ficha.notas) || {};
+  const has = (v) => v !== null && v !== undefined && v !== "";
+  const chips = SCORE_KEYS.filter(([k]) => k !== "cellartracker" && has(n[k])).map(([k,s]) => `<span class="nt"><b>${s}</b> ${esc(fmtNota(n[k]))}</span>`);
+  const x = xwNota(w); if (!has(n.vivino) && x) chips.push(`<span class="nt" title="Comunidade, catálogo X-Wines (2012 a 2021)"><b>Com.</b> ${esc(fmtNota(x))}</span>`);
+  return chips.join("");
 }
 /* price as a number: paid price first, else the first figure of the market estimate; null when unknown */
 function precoNum(w){
@@ -327,7 +335,7 @@ function qualidade(w){
   const n = w.ficha && w.ficha.notas || {};
   const num = (v) => v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v);
   const crit = QUAL_CRIT.map(k => num(n[k])).filter(v => v !== null);
-  const vv = num(n.vivino);
+  const vv = num(n.vivino) ?? xwNota(w);
   const com = vv !== null ? [88 + (vv - 4) * 15] : [];
   if (!crit.length && !com.length) return null;
   const c = crit.length ? (crit.reduce((a,b) => a+b, 0) + 89) / (crit.length + 1) : null;
@@ -430,8 +438,10 @@ function formHtml(w = {}){
     <input type="file" id="foto" accept="image/*" hidden>
     <button class="btn ${w.id ? "" : "primary"}" id="btnFoto" type="button">📷 ${w.id ? (w.fotoId ? "Trocar foto do rótulo" : "Adicionar foto do rótulo") : "Identificar pelo rótulo"}</button>
     <button class="btn small" id="btnGal" type="button">🖼 Galeria</button>
+    ${w.id ? "" : `<button class="btn small" id="btnXw" type="button">🔎 Catálogo</button>`}
     <span class="note" id="fotoStatus"></span>
   </div>
+  ${w.id ? "" : `<div id="xwBox" class="xw"></div>`}
   <form id="wform">
     <div class="grid2">
       <div class="field"><label for="f_produtor">Produtor</label><input id="f_produtor" value="${esc(w.produtor)}" required></div>
@@ -539,6 +549,7 @@ function chave(w){ return [w.produtor, w.vinho, w.safra].map(x => String(x||"").
 function gemea(d){ const k = chave(d); return state.wines.find(x => x.ficha && x.ficha.verificadaEm && chave(x) === k) || null; }
 function openForm(w, keepFoto){
   if (!keepFoto) state.pendingFoto = null;
+  state.xwSel = null;
   openSheet(formHtml(w || {}));
   $("#btnCancel").onclick = w && w.id ? () => openDetail(w.id) : () => { clearDraft(); closeSheet(); };
   const foto = $("#foto"), btnFoto = $("#btnFoto");
@@ -546,6 +557,7 @@ function openForm(w, keepFoto){
   if (isEdit ? !state.assets : (!state.sample || !state.canImages)) btnFoto.hidden = true;
   btnFoto.onclick = () => { if (!isEdit) saveDraft(); tirarFoto(foto, f => isEdit ? guardarFoto(f) : identificar(f)); };
   const btnGal = $("#btnGal"); btnGal.hidden = btnFoto.hidden; btnGal.onclick = () => { if (!isEdit) saveDraft(); galeria(foto); };
+  const btnXw = $("#btnXw"); if (btnXw) btnXw.onclick = () => xwSugerir(false);
   if (!isEdit) $("#wform").oninput = () => saveDraft();
   foto.onchange = async () => { const f = foto.files[0]; foto.value = ""; await (isEdit ? guardarFoto(f) : identificar(f)); };
   if (isEdit) $("#btnDelete").onclick = () => confirmDelete(w);
@@ -561,6 +573,7 @@ function openForm(w, keepFoto){
         toast("Salvo."); openDetail(w.id);
       } else {
         d.criadoEm = new Date().toISOString();
+        if (state.xwSel) d.xw = xwRegistro(state.xwSel, d.safra);
         const igual = gemea(d);
         if (igual){
           d.ficha = { ...igual.ficha, observacoes: [(igual.ficha.observacoes||""), `Ficha copiada da garrafa igual cadastrada em ${(igual.criadoEm||"").slice(0,10)}.`].filter(Boolean).join(" ") };
@@ -743,6 +756,104 @@ async function confirmDelete(w){
   $("#yes").onclick = async () => { try { await state.db.doc("vinhos/"+w.id).delete(); closeSheet(); toast("Excluída."); } catch(e){ toast(dbErr(e)); } };
 }
 
+/* ---------- X-Wines catalog lookup (offline index published with the page) ---------- */
+const XW = { wineries:null, loading:null, shards:{}, SHARDS:128,
+  STOP: new Set("de di del della dei do da dos das la le el los las the y e et and en vina vinedos bodega bodegas vinicola cantina cantine tenuta tenute chateau domaine domaines casa wines wine winery figli fratelli herederos familia family famiglia estate estates vineyards vineyard cave caves quinta weingut".split(" ")) };
+/* keepPar: catalog names keep what is in parentheses ("Brut (Carte Jaune)"); our own fields drop it ("Montes (Grupo X)"). */
+function xwNorm(t, keepPar){ let x = String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); if (!keepPar) x = x.replace(/\([^)]*\)/g, " "); return x.replace(/[^a-z0-9]+/g, " ").trim(); }
+function xwToks(t, keepPar){ return xwNorm(t, keepPar).split(" ").filter(w => w.length > 1 && !XW.STOP.has(w)); }
+async function xwLoadWineries(){
+  if (XW.wineries) return XW.wineries;
+  if (!XW.loading) XW.loading = XW.fetchJson("xw/wineries.json").then(a => { XW.wineries = a.map(([id, name]) => ({ id, name, t: xwToks(name, true), sq: xwNorm(name, true).replace(/ /g, "") })); return XW.wineries; });
+  return XW.loading;
+}
+async function xwShard(wineryId){
+  const k = String(wineryId % XW.SHARDS).padStart(3, "0");
+  if (!XW.shards[k]) XW.shards[k] = XW.fetchJson(`xw/w/${k}.json`);
+  return (await XW.shards[k])[String(wineryId)] || [];
+}
+/* Returns up to 3 candidates [{score, wineryId, winery, id, name, type, grapes, country, region, abv, body, acid, harm, avg, n, vint}] */
+async function xwLookup(q){
+  const wineries = await xwLoadWineries();
+  const pT = new Set(xwToks(q.produtor)), vT = xwToks(q.vinho), all = new Set([...pT, ...vT, ...xwToks(q.uvas)]);
+  const pv = new Set([...pT, ...vT]);
+  const sq = xwNorm((q.produtor||"") + " " + (q.vinho||"")).replace(/ /g, "");
+  if (!pv.size) return [];
+  const cands = [];
+  for (const w of wineries){
+    if (!w.t.length) continue;
+    let m = 0, inP = 0, len = 0;
+    for (const t of w.t){ if (pv.has(t)){ m++; len += t.length; if (pT.has(t)) inP++; } }
+    const allIn = m === w.t.length, sub = w.sq.length >= 6 && sq.includes(w.sq);
+    if (!(allIn || sub || (m >= 2 && m / w.t.length >= 0.66))) continue;
+    cands.push({ w, s: (sub && !allIn ? w.sq.length : len) + inP * 3 + (allIn ? 2 : 0), inP });
+  }
+  cands.sort((a,b) => b.s - a.s);
+  const out = [];
+  for (const c of cands.slice(0, 8)){
+    const wines = await xwShard(c.w.id);
+    for (const r of wines){
+      const nT = xwToks(r[1], true); if (!nT.length) continue;
+      const full = new Set([...nT, ...c.w.t]);
+      const cv = vT.length ? vT.filter(t => full.has(t)).length / vT.length : 0;
+      const vs = nT.filter(t => all.has(t)).length / nT.length;
+      const score = 0.5 * cv + 0.3 * vs + 0.2 * (c.inP ? 1 : 0.6);
+      out.push({ score, wineryId:c.w.id, winery:c.w.name, id:r[0], name:r[1], type:r[2], grapes:r[3], country:r[4], region:r[5], abv:r[6], body:r[7], acid:r[8], harm:r[9], avg:r[10], n:r[11], vint:r[12] });
+    }
+  }
+  out.sort((a,b) => b.score - a.score || (b.n||0) - (a.n||0));
+  return out.filter(o => o.score >= 0.55).slice(0, 3);
+}
+function xwVintage(c, safra){ const m = String(c.vint||"").split(",").map(x => x.split(":")).find(x => x[0] === String(safra||"")); return m ? { avg:Number(m[1]), n:Number(m[2]) } : null; }
+
+XW.fetchJson = async (path) => { const r = await fetch(path); if (!r.ok) throw new Error("http " + r.status); return r.json(); };
+const XW_TIPO = { "Red":"Tinto", "White":"Branco", "Rosé":"Rosé", "Sparkling":"Espumante", "Dessert":"Doce", "Dessert/Port":"Fortificado" };
+const XW_PAIS = { "Italy":"Itália", "France":"França", "Spain":"Espanha", "United States":"Estados Unidos", "Brazil":"Brasil", "Uruguay":"Uruguai", "Germany":"Alemanha", "Australia":"Austrália", "South Africa":"África do Sul", "New Zealand":"Nova Zelândia", "Austria":"Áustria", "Greece":"Grécia", "Hungary":"Hungria", "Switzerland":"Suíça", "Lebanon":"Líbano", "Mexico":"México", "Canada":"Canadá", "Romania":"Romênia", "Croatia":"Croácia", "Slovenia":"Eslovênia", "Georgia":"Geórgia", "Israel":"Israel", "England":"Inglaterra", "United Kingdom":"Reino Unido" };
+const XW_CORPO = { "Very light-bodied":"muito leve", "Light-bodied":"leve", "Medium-bodied":"médio", "Full-bodied":"encorpado", "Very full-bodied":"muito encorpado" };
+const XW_ACIDEZ = { "Low":"baixa", "Medium":"média", "High":"alta" };
+const fmtMil = (n) => Number(n||0).toLocaleString("pt-BR");
+/* community figure used when the ficha has no Vivino score: the vintage's mean when it has 20+ ratings, else the label's */
+function xwNota(w){ const x = w && w.xw; if (!x) return null; if (x.mediaSafra && x.nSafra >= 20) return Number(x.mediaSafra); return x.media ? Number(x.media) : null; }
+function xwTexto(x){
+  if (!x) return "";
+  const parts = [];
+  if (x.mediaSafra) parts.push(`${fmtNota(x.mediaSafra)} em ${fmtMil(x.nSafra)} avaliações da safra`);
+  if (x.media) parts.push(`${fmtNota(x.media)} em ${fmtMil(x.n)} no rótulo`);
+  return parts.join("; ");
+}
+function xwRegistro(c, safra){
+  const v = xwVintage(c, safra);
+  return { id:c.id, vinicola:c.winery, nome:c.name, media:c.avg, n:c.n, mediaSafra: v ? v.avg : null, nSafra: v ? v.n : 0, corpo:c.body||"", acidez:c.acid||"", harm:c.harm||"", uvas:c.grapes||"", fonte:"X-Wines (2012 a 2021)" };
+}
+async function xwSugerir(auto){
+  const box = $("#xwBox"); if (!box) return;
+  const v = id => ($("#"+id)?.value ?? "").trim();
+  const q = { produtor:v("f_produtor"), vinho:v("f_vinho"), uvas:v("f_uvas") };
+  if (!q.produtor && !q.vinho){ if (!auto) box.innerHTML = `<div class="note">Preencha produtor ou vinho para buscar no catálogo.</div>`; return; }
+  box.innerHTML = `<div class="note"><span class="spin"></span>Procurando no catálogo…</div>`;
+  let cands = [];
+  try { cands = await xwLookup(q); } catch(e){ box.innerHTML = auto ? "" : `<div class="note">Catálogo indisponível agora.</div>`; return; }
+  if (!$("#xwBox")) return;
+  if (!cands.length){ box.innerHTML = `<div class="note">Não achei este vinho no catálogo. A pesquisa do Claude cuida do resto.</div>`; return; }
+  const safra = v("f_safra");
+  box.innerHTML = `<div class="note" style="margin-bottom:6px">É um destes? Toque para confirmar.</div>` + cands.map((c,i) => { const vs = xwVintage(c, safra);
+    return `<button type="button" class="xwc" data-i="${i}"><b>${esc(c.winery)} · ${esc(c.name)}</b><span>${esc([XW_TIPO[c.type]||c.type, c.region, XW_PAIS[c.country]||c.country].filter(Boolean).join(" · "))}${c.avg ? ` · ★ ${esc(fmtNota(c.avg))} (${fmtMil(c.n)})` : ""}${vs ? ` · safra ${esc(safra)}: ${esc(fmtNota(vs.avg))} (${fmtMil(vs.n)})` : ""}</span></button>`; }).join("") +
+    `<button type="button" class="btn small" id="xwNone" style="margin-top:6px">Nenhum destes</button>`;
+  box.querySelectorAll(".xwc").forEach(b => b.onclick = () => xwAplicar(cands[Number(b.dataset.i)]));
+  $("#xwNone").onclick = () => { state.xwSel = null; box.innerHTML = `<div class="note">Certo, sem catálogo para esta garrafa.</div>`; };
+}
+function xwAplicar(c){
+  state.xwSel = c;
+  const setIfEmpty = (id, val) => { const el = $("#"+id); if (el && val && !el.value.trim()) el.value = val; };
+  setIfEmpty("f_uvas", String(c.grapes||"").split("|").join(", "));
+  setIfEmpty("f_regiao", c.region); setIfEmpty("f_pais", XW_PAIS[c.country] || c.country);
+  const t = $("#f_tipo"), tt = XW_TIPO[c.type]; if (t && tt && TIPOS.includes(tt)) t.value = tt;
+  const x = xwRegistro(c, ($("#f_safra")?.value||"").trim());
+  $("#xwBox").innerHTML = `<div class="xwok"><b>Catálogo:</b> ${esc(c.winery)} · ${esc(c.name)}${xwTexto(x) ? `<br><span>Comunidade: ${esc(xwTexto(x))}</span>` : ""} <button type="button" class="btn small" id="xwTroca">Trocar</button></div>`;
+  $("#xwTroca").onclick = () => { state.xwSel = null; xwSugerir(false); };
+  saveDraft();
+}
+
 /* ---------- identify by label ---------- */
 /* The model sometimes wraps the JSON in prose or a code fence; pull the first {...} block out and parse it. */
 function parseJsonLoose(text){
@@ -772,6 +883,7 @@ async function identificar(file, opts = {}){
     if (d && typeof d === "object"){ fillForm(d, prefix); st.textContent = "Rótulo lido. Confira os campos."; }
     else throw { code:"invalid_json", text: r && r.text };
     saveDraft(prefix);
+    if (prefix === "f_" && $("#xwBox")) xwSugerir(true);
   } catch(e){
     const code = e && e.code || "desconhecido";
     const msgs = { not_granted:"Leitura de rótulo não autorizada nesta página.", rate_limited:"Muitas leituras seguidas. Aguarde um minuto.", image_rejected:"Foto recusada (tipo ou tamanho). Tente outra.", images_unavailable:"Este aparelho não envia fotos ao Claude.", invalid_json:"O Claude leu, mas respondeu fora do formato.", refused:"O Claude recusou esta imagem.", upstream_error:"Falha de conexão com o Claude.", cancelled:"Leitura cancelada." };
@@ -852,6 +964,7 @@ function openDetail(id){
     ${f.fontes && f.fontes.length ? `<div class="note" style="margin-top:8px">Fontes: ${f.fontes.map(s => esc(s)).join("; ")}</div>` : ""}
     ${f.wineSearcherUrl && /^https:\/\/www\.wine-searcher\.com\//.test(f.wineSearcherUrl) ? `<div style="margin-top:8px"><a class="btn small" href="${esc(f.wineSearcherUrl)}" target="_blank" rel="noopener">Ver na Wine-Searcher</a></div>` : ""}
     <div class="note" style="margin-top:8px">${f.verificadaEm ? `Notas verificadas em fontes externas em ${esc(f.verificadaEm.slice(0,10))}.` : `Confiança da ficha: ${esc(f.confianca||"?")}. Gerada ${f.atualizadoEm ? "em " + esc(f.atualizadoEm.slice(0,10)) : ""} a partir do conhecimento do Claude, sem consulta à internet.`}</div></div>` : ""}
+  ${w.xw ? `<div class="sec"><h3>Catálogo</h3><div class="note">${esc(w.xw.vinicola||"")} · ${esc(w.xw.nome||"")}${xwTexto(w.xw) ? `<br>Comunidade (X-Wines, 2012 a 2021): ${esc(xwTexto(w.xw))}.` : ""}${w.xw.corpo || w.xw.acidez ? `<br>Corpo ${esc(XW_CORPO[w.xw.corpo] || w.xw.corpo || "?")}, acidez ${esc(XW_ACIDEZ[w.xw.acidez] || w.xw.acidez || "?")}.` : ""}</div></div>` : ""}
   <div class="sec"><h3>Pesquisa de terceiros</h3>
     <div class="row" style="justify-content:space-between">
       <span class="note">${pesquisaLabel(w)}</span>
